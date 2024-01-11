@@ -2,14 +2,12 @@
 
 Summary: Dynamic analysis tools to detect memory or thread bugs and profile
 Name: %{?scl_prefix}valgrind
-Version: 3.19.0
-Release: 1%{?dist}
+Version: 3.21.0
+Release: 8%{?dist}
 Epoch: 1
 License: GPLv2+
 URL: https://www.valgrind.org/
 Group: Development/Debuggers
-
-# Only necessary for RHEL, will be ignored on Fedora
 
 # Are we building for a Software Collection?
 %{?scl:%global is_scl 1}
@@ -86,6 +84,31 @@ Patch3: valgrind-3.16.0-some-stack-protector.patch
 # Add some -Wl,z,now.
 Patch4: valgrind-3.16.0-some-Wl-z-now.patch
 
+# Workaround https://bugs.kde.org/show_bug.cgi?id=402833
+# by disabling overlap checking for memcpy
+Patch5: valgrind-3.21.0-no-memcpy-replace-check.patch
+
+# Add --with-gdbscripts-dir=PATH configure option
+# https://bugs.kde.org/show_bug.cgi?id=469768
+Patch6: valgrind-3.21.0-Add-with-gdbscripts-dir.patch
+
+# Can't run callgrind_control with valgrind 3.21.0 because of perl errors
+# https://bugs.kde.org/show_bug.cgi?id=470121
+Patch8: valgrind-3.21.0-callgrind_control-no-strict.patch
+
+# Multiple realloc zero errors crash in MC_(eq_Error)
+# https://bugs.kde.org/show_bug.cgi?id=470520
+Patch9: valgrind-3.21.0-realloc-again.patch
+
+# s390x: Assertion failure on VGM instruction
+# https://bugs.kde.org/show_bug.cgi?id=470132
+Patch10: valgrind-3.21.0-vgm.patch
+Patch11: valgrind-3.21.0-vgm-tests.patch
+
+# s390x: Valgrind cannot start qemu-kvm when "sysctl vm.allocate_pgste=0"
+# https://bugs.kde.org/show_bug.cgi?id=470978
+Patch12: valgrind-3.21.0-pgste.patch
+
 BuildRequires: make
 BuildRequires: glibc-devel
 
@@ -122,6 +145,10 @@ BuildRequires: elfutils-debuginfod-client
 # For using debuginfod at runtime
 Recommends: elfutils-debuginfod-client
 %endif
+
+# Some of the python scripts require python 3.9+
+BuildRequires: python3.11
+BuildRequires: python3.11-rpm-macros
 
 %{?scl:Requires:%scl_runtime}
 
@@ -226,6 +253,15 @@ Valgrind User Manual for details.
 %patch4 -p1
 %endif
 
+%patch5 -p1
+%patch6 -p1
+
+%patch8 -p1
+%patch9 -p1
+%patch10 -p1
+%patch11 -p1
+%patch12 -p1
+
 
 %build
 
@@ -291,7 +327,8 @@ export LDFLAGS
 %configure \
   --with-mpicc=%{mpiccpath} \
   %{only_arch} \
-  GDB=%{_bindir}/gdb
+  GDB=%{_bindir}/gdb \
+  --without-gdbscripts-dir
 
 make %{?_smp_mflags}
 
@@ -451,6 +488,24 @@ fi
 %endif
 
 %changelog
+* Tue Jun 27 2023 Mark Wielaard <mjw@redhat.com> - 3.21.0-8
+- BuildRequire python3.11
+
+* Fri Jun 23 2023 Mark Wielaard <mjw@redhat.com> - 3.21.0-7
+- Add valgrind-3.21.0-callgrind_control-no-strict.patch
+- Add valgrind-3.21.0-realloc-again.patch
+- Update valgrind-3.21.0-no-memcpy-replace-check.patch (memcpy_chk)
+- Add valgrind-3.21.0-vgm.patch and valgrind-3.21.0-vgm-tests.patch
+- Add valgrind-3.21.0-pgste.patch
+
+* Tue May 16 2023 Alexandra Hájková <ahajkova@redhat.com> - 3.21.0-3
+- Add valgrind-3.21.0-Add-with-gdbscripts-dir.patch
+
+* Fri May  5 2023 Mark Wielaard <mjw@redhat.com> - 3.21.0-2
+- Upgrade to upstream 3.21.0
+- Remove upstreamed patches
+- Add valgrind-3.21.0-no-memcpy-replace-check.patch
+
 * Tue Apr 19 2022 Mark Wielaard <mjw@redhat.com> - 3.19.0-1
 - Upgrade to valgrind 3.19.0. Drop old patches.
 

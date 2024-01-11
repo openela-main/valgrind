@@ -1,0 +1,22 @@
+diff --git a/shared/vg_replace_strmem.c b/shared/vg_replace_strmem.c
+index b32f13f76..464e8d4ca 100644
+--- a/shared/vg_replace_strmem.c
++++ b/shared/vg_replace_strmem.c
+@@ -1128,7 +1128,7 @@ static inline void my_exit ( int x )
+    MEMMOVE_OR_MEMCPY(20181, soname, fnname, 0)
+ 
+ #define MEMCPY(soname, fnname) \
+-   MEMMOVE_OR_MEMCPY(20180, soname, fnname, 1)
++   MEMMOVE_OR_MEMCPY(20180, soname, fnname, 0) /* See KDE bug #402833 */
+ 
+ #if defined(VGO_linux)
+  /* For older memcpy we have to use memmove-like semantics and skip
+@@ -1714,8 +1714,6 @@ static inline void my_exit ( int x )
+       RECORD_COPY(len); \
+       if (len == 0) \
+          return dst; \
+-      if (is_overlap(dst, src, len, len)) \
+-         RECORD_OVERLAP_ERROR("memcpy_chk", dst, src, len); \
+       if ( dst > src ) { \
+          d = (HChar *)dst + len - 1; \
+          s = (const HChar *)src + len - 1; \

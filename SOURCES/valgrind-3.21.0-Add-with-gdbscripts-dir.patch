@@ -1,0 +1,152 @@
+From e3602b3eec0696b183722ea21da14588cf205c74 Mon Sep 17 00:00:00 2001
+From: Mark Wielaard <mark@klomp.org>
+Date: Sun, 14 May 2023 23:34:05 +0200
+Subject: [PATCH] Add --with-gdbscripts-dir=PATH configure option
+
+Currently the gdb valgrind scripts are installed under VG_LIBDIR
+which is normally pkglibexecdir which is likely not in the default
+gdb safe-path (a list of directories from which it is safe to
+auto-load files). So users will have to add the directory to their
+.gdbinit file.
+
+This patch adds a --with-gdbscripts-dir=PATH configure option that
+sets VG_GDBSCRIPTS_DIR to the given PATH (${libexecdir}/valgrind if
+not given). A user can also configure --without-gdbscripts-dir to
+disable adding a .debug_gdb_scripts section to the vgpreload library
+and installing the valgrind-monitor python scripts completely.
+
+Use VG_GDBSCRIPTS_DIR as gdbscriptsdir to install the valgrind-monitor
+python files and pass it with CPPFLAGS when building vg_preloaded.c
+and vgdb.c to use instead of VG_LIBDIR.
+
+https://bugs.kde.org/show_bug.cgi?id=469768
+---
+ NEWS                     |  8 ++++++++
+ configure.ac             | 17 +++++++++++++++++
+ coregrind/Makefile.am    | 20 +++++++++++++++-----
+ coregrind/vg_preloaded.c |  4 +++-
+ coregrind/vgdb.c         |  9 +++++++--
+ 5 files changed, 50 insertions(+), 8 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 15fbf5ea2..0cf84a1c0 100755
+--- a/configure.ac
++++ b/configure.ac
+@@ -1198,6 +1198,23 @@ AC_MSG_RESULT([$xcodedir])
+ AC_DEFINE_UNQUOTED(XCODE_DIR, "$xcodedir", [xcode sdk include directory])
+ AC_SUBST(XCODE_DIR, [$xcodedir])])
+ 
++#----------------------------------------------------------------------------
++# Where to install gdb scripts, defaults to VG_LIBDIR (pkglibexecdir)
++#----------------------------------------------------------------------------
++AC_MSG_CHECKING([where gdb scripts are installed])
++AC_ARG_WITH(gdbscripts-dir,
++   [  --with-gdbscripts-dir=PATH  Specify path to install gdb scripts],
++   [gdbscriptsdir=${withval}],
++   [gdbscriptsdir=${libexecdir}/valgrind])
++AC_MSG_RESULT([$gdbscriptsdir])
++if test "x$gdbscriptsdir" != "xno"; then
++  AC_SUBST(VG_GDBSCRIPTS_DIR, [$gdbscriptsdir])
++  AM_CONDITIONAL(GDBSCRIPTS, true)
++else
++  AC_SUBST(VG_GDBSCRIPTS_DIR, [])
++  AM_CONDITIONAL(GDBSCRIPTS, false)
++fi
++
+ #----------------------------------------------------------------------------
+ # Libc and suppressions
+ #----------------------------------------------------------------------------
+diff --git a/coregrind/Makefile.am b/coregrind/Makefile.am
+index 553211782..8a7f753a6 100644
+--- a/coregrind/Makefile.am
++++ b/coregrind/Makefile.am
+@@ -101,7 +101,7 @@
+ vgdb_SOURCES += vgdb-invoker-freebsd.c
+ endif
+ 
+-vgdb_CPPFLAGS  = $(AM_CPPFLAGS_PRI)
++vgdb_CPPFLAGS  = $(AM_CPPFLAGS_PRI) $(GDB_SCRIPTS_DIR)
+ vgdb_CFLAGS    = $(AM_CFLAGS_PRI) $(LTO_CFLAGS) -fstack-protector-strong
+ vgdb_CCASFLAGS = $(AM_CCASFLAGS_PRI)
+ vgdb_LDFLAGS   = $(AM_CFLAGS_PRI) @LIB_UBSAN@ -Wl,-z,now
+@@ -624,9 +624,15 @@ if VGCONF_OS_IS_DARWIN
+ noinst_DSYMS = $(noinst_PROGRAMS)
+ endif
+ 
++if GDBSCRIPTS
++  GDB_SCRIPTS_DIR=-DVG_GDBSCRIPTS_DIR="\"@VG_GDBSCRIPTS_DIR@\""
++else
++  GDB_SCRIPTS_DIR=
++endif
++
+ vgpreload_core_@VGCONF_ARCH_PRI@_@VGCONF_OS@_so_SOURCES = vg_preloaded.c
+ vgpreload_core_@VGCONF_ARCH_PRI@_@VGCONF_OS@_so_CPPFLAGS = \
+-	$(AM_CPPFLAGS_@VGCONF_PLATFORM_PRI_CAPS@)
++	$(AM_CPPFLAGS_@VGCONF_PLATFORM_PRI_CAPS@) $(GDB_SCRIPTS_DIR)
+ vgpreload_core_@VGCONF_ARCH_PRI@_@VGCONF_OS@_so_CFLAGS = \
+ 	$(AM_CFLAGS_PSO_@VGCONF_PLATFORM_PRI_CAPS@)
+ vgpreload_core_@VGCONF_ARCH_PRI@_@VGCONF_OS@_so_LDFLAGS = \
+@@ -634,7 +640,7 @@ vgpreload_core_@VGCONF_ARCH_PRI@_@VGCONF_OS@_so_LDFLAGS = \
+ if VGCONF_HAVE_PLATFORM_SEC
+ vgpreload_core_@VGCONF_ARCH_SEC@_@VGCONF_OS@_so_SOURCES = vg_preloaded.c
+ vgpreload_core_@VGCONF_ARCH_SEC@_@VGCONF_OS@_so_CPPFLAGS = \
+-	$(AM_CPPFLAGS_@VGCONF_PLATFORM_SEC_CAPS@)
++	$(AM_CPPFLAGS_@VGCONF_PLATFORM_SEC_CAPS@) $(GDBSCRIPTS_DIR)
+ vgpreload_core_@VGCONF_ARCH_SEC@_@VGCONF_OS@_so_CFLAGS = \
+ 	$(AM_CFLAGS_PSO_@VGCONF_PLATFORM_SEC_CAPS@)
+ vgpreload_core_@VGCONF_ARCH_SEC@_@VGCONF_OS@_so_LDFLAGS = \
+@@ -766,8 +772,12 @@ GDBSERVER_XML_FILES = \
+ # so as to make sure these get copied into the install tree
+ vglibdir = $(pkglibexecdir)
+ vglib_DATA  = $(GDBSERVER_XML_FILES)
+-vglib_DATA  += m_gdbserver/valgrind-monitor.py
+-vglib_DATA  += m_gdbserver/valgrind-monitor-def.py
++
++if GDBSCRIPTS
++gdbscriptsdir = @VG_GDBSCRIPTS_DIR@
++gdbscripts_DATA  = m_gdbserver/valgrind-monitor.py
++gdbscripts_DATA += m_gdbserver/valgrind-monitor-def.py
++endif
+ 
+ # so as to make sure these get copied into the tarball
+ EXTRA_DIST  += $(GDBSERVER_XML_FILES)
+diff --git a/coregrind/vg_preloaded.c b/coregrind/vg_preloaded.c
+index d6e05898c..86f6ac5a2 100644
+--- a/coregrind/vg_preloaded.c
++++ b/coregrind/vg_preloaded.c
+@@ -61,7 +61,9 @@
+ .popsection \n\
+ ");
+ 
+-DEFINE_GDB_PY_SCRIPT(VG_LIBDIR "/valgrind-monitor.py")
++#ifdef VG_GDBSCRIPTS_DIR
++DEFINE_GDB_PY_SCRIPT(VG_GDBSCRIPTS_DIR "/valgrind-monitor.py")
++#endif
+ #endif
+ 
+ #if defined(VGO_linux) || defined(VGO_solaris) || defined(VGO_freebsd)
+diff --git a/coregrind/vgdb.c b/coregrind/vgdb.c
+index 8ec424077..56a969de7 100644
+--- a/coregrind/vgdb.c
++++ b/coregrind/vgdb.c
+@@ -1982,10 +1982,15 @@ void usage(void)
+ "  -d  arg tells to show debug info. Multiple -d args for more debug info\n"
+ "\n"
+ "  -h --help shows this message\n"
++#ifdef VG_GDBSCRIPTS_DIR
+ "  The GDB python code defining GDB front end valgrind commands is:\n       %s\n"
++#endif
+ "  To get help from the Valgrind gdbserver, use vgdb help\n"
+-"\n", vgdb_prefix_default(), VG_LIBDIR "/valgrind-monitor.py"
+-           );
++"\n", vgdb_prefix_default()
++#ifdef VG_GDBSCRIPTS_DIR
++    , VG_GDBSCRIPTS_DIR "/valgrind-monitor.py"
++#endif
++   );
+    invoker_restrictions_msg();
+ }
+ 
+-- 
+2.31.1
+

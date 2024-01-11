@@ -1,0 +1,12 @@
+diff --git a/callgrind/callgrind_control.in b/callgrind/callgrind_control.in
+index 083ffa29f..eb50c16ad 100644
+--- a/callgrind/callgrind_control.in
++++ b/callgrind/callgrind_control.in
+@@ -22,7 +22,6 @@
+ #  You should have received a copy of the GNU General Public License
+ #  along with this program; if not, see <http://www.gnu.org/licenses/>.
+ 
+-use strict;
+ use warnings;
+ 
+ use File::Basename;
