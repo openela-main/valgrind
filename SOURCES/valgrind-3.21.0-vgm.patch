@@ -1,0 +1,99 @@
+From 70ef4417837b690755feede0088331a28b102c65 Mon Sep 17 00:00:00 2001
+From: Andreas Arnez <arnez@linux.ibm.com>
+Date: Mon, 22 May 2023 18:57:35 +0200
+Subject: [PATCH 1/2] Bug 470132 - s390x: Fix the wrap-around case in VGM
+
+Valgrind's implementation of VGM is incomplete:
+
+* It doesn't support generating a wrap-around bit mask.  Such a mask
+  should result when the ending bit position is smaller than the starting
+  bit position.  Valgrind runs into an assertion failure instead.
+
+* It doesn't ignore unused bits in the I2 and I3 fields of the
+  instruction, as it should.
+
+Fix this by re-implementing the main logic in s390_irgen_VGM().
+---
+ VEX/priv/guest_s390_toIR.c | 57 +++++++++++++++-----------------------
+ 1 file changed, 22 insertions(+), 35 deletions(-)
+
+diff --git a/VEX/priv/guest_s390_toIR.c b/VEX/priv/guest_s390_toIR.c
+index 11dda41ef..d9d746c38 100644
+--- a/VEX/priv/guest_s390_toIR.c
++++ b/VEX/priv/guest_s390_toIR.c
+@@ -16388,50 +16388,37 @@ s390_irgen_VGBM(UChar v1, UShort i2, UChar m3 __attribute__((unused)))
+ static const HChar *
+ s390_irgen_VGM(UChar v1, UShort i2, UChar m3)
+ {
+-   UChar from = (i2 & 0xff00) >> 8;
+-   UChar to   = (i2 & 0x00ff);
+-   ULong value = 0UL;
+-   IRType type = s390_vr_get_type(m3);
+-   vassert(from <= to);
+-
+-   UChar maxIndex = 0;
+-   switch (type) {
+-   case Ity_I8:
+-      maxIndex = 7;
+-      break;
+-   case Ity_I16:
+-      maxIndex = 15;
+-      break;
+-   case Ity_I32:
+-      maxIndex = 31;
+-      break;
+-   case Ity_I64:
+-      maxIndex = 63;
+-      break;
+-   default:
+-      vpanic("s390_irgen_VGM: unknown type");
+-   }
+-
+-   for(UChar index = from; index <= to; index++) {
+-      value |= (1ULL << (maxIndex - index));
+-   }
+-
+-   IRExpr *fillValue;
+-   switch (type) {
+-   case Ity_I8:
++   s390_insn_assert("vgm", m3 <= 3);
++
++   UChar  max_idx = (8 << m3) - 1;
++   UChar  from    = max_idx & (i2 >> 8);
++   UChar  to      = max_idx & i2;
++   ULong  all_one = (1ULL << max_idx << 1) - 1;
++   ULong  value   = (all_one >> from) ^ (all_one >> to >> 1);
++
++   /* In case of wrap-around we now have a value that needs inverting:
++          to         from
++          V           V
++      00000111111111110000000000000000 */
++   if (to < from)
++      value ^= all_one;
++
++   IRExpr* fillValue;
++   switch (m3) {
++   case 0:
+       fillValue = mkU8(value);
+       break;
+-   case Ity_I16:
++   case 1:
+       fillValue = mkU16(value);
+       break;
+-   case Ity_I32:
++   case 2:
+       fillValue = mkU32(value);
+       break;
+-   case Ity_I64:
++   case 3:
+       fillValue = mkU64(value);
+       break;
+    default:
+-      vpanic("s390_irgen_VGM: unknown type");
++      vpanic("s390_irgen_VGM: unknown element size");
+    }
+ 
+    s390_vr_fill(v1, fillValue);
+-- 
+2.40.1
+

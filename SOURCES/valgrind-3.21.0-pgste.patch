@@ -1,0 +1,73 @@
+From 56f1bd12c92806fd18337ba4cd3c0a8d714d0e94 Mon Sep 17 00:00:00 2001
+From: Andreas Arnez <arnez@linux.ibm.com>
+Date: Thu, 15 Jun 2023 17:24:53 +0200
+Subject: [PATCH] Bug 470978 - s390x: Link the tools with -Wl,--s390-pgste
+
+Programs that require the PGSTE mode to be enabled may currently fail
+under Valgrind.  In particular this affects qemu-kvm.
+
+While it is also possible to enable the PGSTE mode globally with
+
+  sysctl vm.allocate_psgte=1
+
+the problem can more easily be prevented by linking the Valgrind tools
+with -Wl,--s390-pgste.  Add a configure check if the linker supports this,
+and activate the flag if it does.
+
+To verify the intended result, the following shell command can be used to
+list the executables having this flag set:
+
+  find . -type f -perm -u+x -execdir \
+       /bin/sh -c 'readelf -lW $0 2>/dev/null | grep PGSTE' {} \; -print
+---
+ Makefile.tool.am |  2 +-
+ configure.ac     | 20 ++++++++++++++++++++
+ 2 files changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/Makefile.tool.am b/Makefile.tool.am
+index df9502913..4ce6d5ab0 100644
+--- a/Makefile.tool.am
++++ b/Makefile.tool.am
+@@ -78,7 +78,7 @@ TOOL_LDFLAGS_ARM64_LINUX = \
+ 	$(TOOL_LDFLAGS_COMMON_LINUX) @FLAG_M64@
+ 
+ TOOL_LDFLAGS_S390X_LINUX = \
+-	$(TOOL_LDFLAGS_COMMON_LINUX) @FLAG_M64@
++	$(TOOL_LDFLAGS_COMMON_LINUX) @FLAG_M64@ @FLAG_S390_PGSTE@
+ 
+ TOOL_LDFLAGS_X86_DARWIN = \
+ 	$(TOOL_LDFLAGS_COMMON_DARWIN) -arch i386
+diff --git a/configure.ac b/configure.ac
+index 0cf84a1c0..1d4164a7d 100755
+--- a/configure.ac
++++ b/configure.ac
+@@ -3096,6 +3096,26 @@ AC_SUBST([FLAG_NO_BUILD_ID], [""])
+ fi
+ CFLAGS=$safe_CFLAGS
+ 
++# On s390x, if the linker supports -Wl,--s390-pgste, then we build the
++# tools with that flag.  This enables running programs that need it, such
++# as qemu-kvm.
++if test x$VGCONF_PLATFORM_PRI_CAPS = xS390X_LINUX; then
++AC_MSG_CHECKING([if the linker accepts -Wl,--s390-pgste])
++safe_CFLAGS=$CFLAGS
++CFLAGS="-Wl,--s390-pgste"
++
++AC_LINK_IFELSE(
++[AC_LANG_PROGRAM([ ], [return 0;])],
++[
++  AC_SUBST([FLAG_S390_PGSTE], ["-Wl,--s390-pgste"])
++  AC_MSG_RESULT([yes])
++], [
++  AC_SUBST([FLAG_S390_PGSTE], [""])
++  AC_MSG_RESULT([no])
++])
++CFLAGS=$safe_CFLAGS
++fi
++
+ # does the ppc assembler support "mtocrf" et al?
+ AC_MSG_CHECKING([if ppc32/64 as supports mtocrf/mfocrf])
+ 
+-- 
+2.40.1
+

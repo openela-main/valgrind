@@ -2,13 +2,11 @@
 
 Summary: Dynamic analysis tools to detect memory or thread bugs and profile
 Name: %{?scl_prefix}valgrind
-Version: 3.19.0
-Release: 3%{?dist}
+Version: 3.21.0
+Release: 7%{?dist}
 Epoch: 1
 License: GPLv2+
 URL: https://www.valgrind.org/
-
-# Only necessary for RHEL, will be ignored on Fedora
 
 # Are we building for a Software Collection?
 %{?scl:%global is_scl 1}
@@ -85,11 +83,30 @@ Patch3: valgrind-3.16.0-some-stack-protector.patch
 # Add some -Wl,z,now.
 Patch4: valgrind-3.16.0-some-Wl-z-now.patch
 
-# KDE#434764 # iconv_open causes ld.so v2.28+ to execute optimised strncmp
-Patch5: valgrind-3.19.0-ld-so-strncmp.patch
+# Workaround https://bugs.kde.org/show_bug.cgi?id=402833
+# by disabling overlap checking for memcpy
+Patch5: valgrind-3.21.0-no-memcpy-replace-check.patch
 
-# KDE#454040 s390x: False-positive memcheck:cond in memmem on arch13 systems
-Patch6: valgrind-3.19.0-s390x-memmem.patch
+# Add --with-gdbscripts-dir=PATH configure option
+# https://bugs.kde.org/show_bug.cgi?id=469768
+Patch6: valgrind-3.21.0-Add-with-gdbscripts-dir.patch
+
+# Can't run callgrind_control with valgrind 3.21.0 because of perl errors
+# https://bugs.kde.org/show_bug.cgi?id=470121
+Patch8: valgrind-3.21.0-callgrind_control-no-strict.patch
+
+# Multiple realloc zero errors crash in MC_(eq_Error)
+# https://bugs.kde.org/show_bug.cgi?id=470520
+Patch9: valgrind-3.21.0-realloc-again.patch
+
+# s390x: Assertion failure on VGM instruction
+# https://bugs.kde.org/show_bug.cgi?id=470132
+Patch10: valgrind-3.21.0-vgm.patch
+Patch11: valgrind-3.21.0-vgm-tests.patch
+
+# s390x: Valgrind cannot start qemu-kvm when "sysctl vm.allocate_pgste=0"
+# https://bugs.kde.org/show_bug.cgi?id=470978
+Patch12: valgrind-3.21.0-pgste.patch
 
 BuildRequires: make
 BuildRequires: glibc-devel
@@ -231,6 +248,13 @@ Valgrind User Manual for details.
 %patch5 -p1
 %patch6 -p1
 
+%patch8 -p1
+%patch9 -p1
+%patch10 -p1
+%patch11 -p1
+%patch12 -p1
+
+
 %build
 # LTO triggers undefined symbols in valgrind.  Valgrind has a --enable-lto
 # configure time option, but that doesn't seem to help.
@@ -299,7 +323,8 @@ export LDFLAGS
 %configure \
   --with-mpicc=%{mpiccpath} \
   %{only_arch} \
-  GDB=%{_bindir}/gdb
+  GDB=%{_bindir}/gdb \
+  --with-gdbscripts-dir=%{_datadir}/gdb/auto-load
 
 %make_build
 
@@ -417,6 +442,8 @@ echo ===============END TESTING===============
 # Was disabled in %%install to prevent debuginfo stripping.
 %attr(0755,root,root) %{_libexecdir}/valgrind/vgpreload*-%{valarch}-*so
 %{_mandir}/man1/*
+%{_datadir}/gdb/auto-load/valgrind-monitor.py
+%{_datadir}/gdb/auto-load/valgrind-monitor-def.py
 
 %files devel
 %dir %{_includedir}/valgrind
@@ -459,6 +486,21 @@ fi
 %endif
 
 %changelog
+* Fri Jun 23 2023 Mark Wielaard <mjw@redhat.com> - 3.21.0-7
+- Add valgrind-3.21.0-callgrind_control-no-strict.patch
+- Add valgrind-3.21.0-realloc-again.patch
+- Update valgrind-3.21.0-no-memcpy-replace-check.patch (memcpy_chk)
+- Add valgrind-3.21.0-vgm.patch and valgrind-3.21.0-vgm-tests.patch
+- Add valgrind-3.21.0-pgste.patch
+
+* Tue May 16 2023 Alexandra Hájková <ahajkova@redhat.com> - 3.21.0-3
+- Add valgrind-3.21.0-Add-with-gdbscripts-dir.patch
+
+* Fri May  5 2023 Mark Wielaard <mjw@redhat.com> - 3.21.0-2
+- Upgrade to upstream 3.21.0
+- Remove upstreamed patches
+- Add valgrind-3.21.0-no-memcpy-replace-check.patch
+
 * Wed May 25 2022 Mark Wielaard <mjw@redhat.com> - 3.19.0-3
 - Add valgrind-3.19.0-s390x-memmem.patch
 - Add valgrind-3.19.0-ld-so-strncmp.patch

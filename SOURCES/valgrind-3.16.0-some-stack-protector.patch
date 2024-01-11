@@ -35,19 +35,6 @@ index 56cc5ef..1b7842b 100644
  getoff_@VGCONF_ARCH_PRI@_@VGCONF_OS@_CCASFLAGS = $(AM_CCASFLAGS_PRI)
  getoff_@VGCONF_ARCH_PRI@_@VGCONF_OS@_LDFLAGS   = $(AM_CFLAGS_PRI) @LIB_UBSAN@
  if HAVE_DLINFO_RTLD_DI_TLS_MODID
-diff --git a/cachegrind/Makefile.am b/cachegrind/Makefile.am
-index f8447a1..f572741 100644
---- a/cachegrind/Makefile.am
-+++ b/cachegrind/Makefile.am
-@@ -25,7 +25,7 @@ bin_PROGRAMS = cg_merge
- 
- cg_merge_SOURCES = cg_merge.c
- cg_merge_CPPFLAGS  = $(AM_CPPFLAGS_PRI)
--cg_merge_CFLAGS    = $(AM_CFLAGS_PRI)
-+cg_merge_CFLAGS    = $(AM_CFLAGS_PRI) -fstack-protector-strong
- cg_merge_CCASFLAGS = $(AM_CCASFLAGS_PRI)
- cg_merge_LDFLAGS   = $(AM_CFLAGS_PRI)
- # If there is no secondary platform, and the platforms include x86-darwin,
 diff --git a/configure.ac b/configure.ac
 index f8c798b..ccc8f52 100755
 --- a/configure.ac
