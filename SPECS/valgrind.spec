@@ -2,8 +2,8 @@
 
 Summary: Dynamic analysis tools to detect memory or thread bugs and profile
 Name: %{?scl_prefix}valgrind
-Version: 3.21.0
-Release: 7%{?dist}
+Version: 3.22.0
+Release: 2%{?dist}
 Epoch: 1
 License: GPLv2+
 URL: https://www.valgrind.org/
@@ -15,11 +15,16 @@ URL: https://www.valgrind.org/
 # We never want the openmpi subpackage when building a software collecton.
 # We always want it for fedora.
 # We only want it for older rhel. But not s390x for too old rhel.
+# And on fedora > 39 i386 dropped openmpi.
 %if %{is_scl}
   %global build_openmpi 0
 %else
   %if 0%{?fedora}
-    %global build_openmpi 1
+    %ifarch %{ix86}
+      %global build_openmpi (%{?fedora} < 40)
+    %else
+      %global build_openmpi 1
+    %endif
   %endif
   %if 0%{?rhel}
     %if 0%{?rhel} > 7
@@ -83,30 +88,9 @@ Patch3: valgrind-3.16.0-some-stack-protector.patch
 # Add some -Wl,z,now.
 Patch4: valgrind-3.16.0-some-Wl-z-now.patch
 
-# Workaround https://bugs.kde.org/show_bug.cgi?id=402833
-# by disabling overlap checking for memcpy
-Patch5: valgrind-3.21.0-no-memcpy-replace-check.patch
-
-# Add --with-gdbscripts-dir=PATH configure option
-# https://bugs.kde.org/show_bug.cgi?id=469768
-Patch6: valgrind-3.21.0-Add-with-gdbscripts-dir.patch
-
-# Can't run callgrind_control with valgrind 3.21.0 because of perl errors
-# https://bugs.kde.org/show_bug.cgi?id=470121
-Patch8: valgrind-3.21.0-callgrind_control-no-strict.patch
-
-# Multiple realloc zero errors crash in MC_(eq_Error)
-# https://bugs.kde.org/show_bug.cgi?id=470520
-Patch9: valgrind-3.21.0-realloc-again.patch
-
-# s390x: Assertion failure on VGM instruction
-# https://bugs.kde.org/show_bug.cgi?id=470132
-Patch10: valgrind-3.21.0-vgm.patch
-Patch11: valgrind-3.21.0-vgm-tests.patch
-
-# s390x: Valgrind cannot start qemu-kvm when "sysctl vm.allocate_pgste=0"
-# https://bugs.kde.org/show_bug.cgi?id=470978
-Patch12: valgrind-3.21.0-pgste.patch
+# valgrind 3.22.0 fails on assertion when loading debuginfo
+# https://bugs.kde.org/show_bug.cgi?id=476548
+Patch5: valgrind-3.22.0-rodata.patch
 
 BuildRequires: make
 BuildRequires: glibc-devel
@@ -140,6 +124,7 @@ BuildRequires: docbook-dtds
 
 # For testing debuginfod-find
 %if 0%{?fedora} > 29 || 0%{?rhel} > 7
+BuildRequires: elfutils-debuginfod
 BuildRequires: elfutils-debuginfod-client
 # For using debuginfod at runtime
 Recommends: elfutils-debuginfod-client
@@ -236,24 +221,16 @@ Valgrind User Manual for details.
 %prep
 %setup -q -n %{?scl:%{pkg_name}}%{!?scl:%{name}}-%{version}
 
-%patch1 -p1
-%patch2 -p1
+%patch -P1 -p1
+%patch -P2 -p1
 
 # Old rhel gcc doesn't have -fstack-protector-strong.
 %if 0%{?fedora} || 0%{?rhel} >= 7
-%patch3 -p1
-%patch4 -p1
+%patch -P3 -p1
+%patch -P4 -p1
 %endif
 
-%patch5 -p1
-%patch6 -p1
-
-%patch8 -p1
-%patch9 -p1
-%patch10 -p1
-%patch11 -p1
-%patch12 -p1
-
+%patch -P5 -p1
 
 %build
 # LTO triggers undefined symbols in valgrind.  Valgrind has a --enable-lto
@@ -448,6 +425,7 @@ echo ===============END TESTING===============
 %files devel
 %dir %{_includedir}/valgrind
 %{_includedir}/valgrind/valgrind.h
+%{_includedir}/valgrind/cachegrind.h
 %{_includedir}/valgrind/callgrind.h
 %{_includedir}/valgrind/drd.h
 %{_includedir}/valgrind/helgrind.h
@@ -486,6 +464,18 @@ fi
 %endif
 
 %changelog
+* Wed Dec  6 2023 Mark Wielaard <mjw@redhat.com> - 3.22.0-2
+- Add valgrind-3.22.0-rodata.patch
+
+* Fri Nov  3 2023 Mark Wielaard <mjw@redhat.com> - 3.22.0-1
+- Upstream 3.22.0 final
+- BuildRequires elfutils-debuginfod for testing
+- Remove all upstreamed patches
+- Adjust valgrind-3.16.0-some-stack-protector.patch
+- Adjust valgrind-3.16.0-some-Wl-z-now.patch
+- Add cachegrind.h to valgrind-devel package
+- Use %%patch -Pn instead of deprecated %%patchn
+
 * Fri Jun 23 2023 Mark Wielaard <mjw@redhat.com> - 3.21.0-7
 - Add valgrind-3.21.0-callgrind_control-no-strict.patch
 - Add valgrind-3.21.0-realloc-again.patch
