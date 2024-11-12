@@ -2,8 +2,8 @@
 
 Summary: Dynamic analysis tools to detect memory or thread bugs and profile
 Name: %{?scl_prefix}valgrind
-Version: 3.22.0
-Release: 2%{?dist}
+Version: 3.23.0
+Release: 4%{?dist}
 Epoch: 1
 License: GPLv2+
 URL: https://www.valgrind.org/
@@ -14,7 +14,7 @@ URL: https://www.valgrind.org/
 
 # We never want the openmpi subpackage when building a software collecton.
 # We always want it for fedora.
-# We only want it for older rhel. But not s390x for too old rhel.
+# We only want it for older rhel.
 # And on fedora > 39 i386 dropped openmpi.
 %if %{is_scl}
   %global build_openmpi 0
@@ -30,11 +30,7 @@ URL: https://www.valgrind.org/
     %if 0%{?rhel} > 7
       %global build_openmpi 0
     %else
-      %ifarch s390x
-	%global build_openmpi (%{?rhel} > 6)
-      %else
-	%global build_openmpi 1
-      %endif
+      %global build_openmpi 1
     %endif
   %endif
 %endif
@@ -54,17 +50,11 @@ URL: https://www.valgrind.org/
 # Whether to run the full regtest or only a limited set
 # The full regtest includes gdb_server integration tests
 # and experimental tools.
-# Only run full regtests on fedora, but not on older rhel
-# or when creating scl, the gdb_server tests might hang.
+# Don't run them when creating scl, the gdb_server tests might hang.
 %if %{is_scl}
   %global run_full_regtest 0
 %else
-  %if 0%{?fedora}
-    %global run_full_regtest 1
-  %endif
-  %if 0%{?rhel}
-    %global run_full_regtest (%rhel >= 7)
-  %endif
+  %global run_full_regtest 1
 %endif
 
 # Generating minisymtabs doesn't really work for the staticly linked
@@ -88,9 +78,28 @@ Patch3: valgrind-3.16.0-some-stack-protector.patch
 # Add some -Wl,z,now.
 Patch4: valgrind-3.16.0-some-Wl-z-now.patch
 
-# valgrind 3.22.0 fails on assertion when loading debuginfo
-# https://bugs.kde.org/show_bug.cgi?id=476548
-Patch5: valgrind-3.22.0-rodata.patch
+# Patches from upstream VALGRIND_3_23_BRANCH
+Patch5: 0001-Prepare-NEWS-for-branch-3.23-fixes.patch
+Patch6: 0002-486180-MIPS-VexGuestArchState-has-no-member-named-gu.patch
+Patch7: 0003-Bug-486293-memccpy-false-positives.patch
+Patch8: 0004-Bug-486569-linux-inotify_init-syscall-wrapper-missin.patch
+Patch9: 0005-aarch64-frinta-and-frinta-vector-instructions.patch
+Patch10: 0006-mips-skip-using-shared-syscall-numbers-for-mips32.patch
+Patch11: 0007-Fix-uninitialized-err-in-handle_extension.patch
+Patch12: 0008-Avoid-use-of-guest_IP_AT_SYSCALL-in-handle_extension.patch
+Patch13: 0009-s390x-Minor-fixes-in-extension-s390x.c.patch
+Patch14: 0010-Bug-453044-gbserver_tests-failures-in-aarch64.patch
+Patch15: 0011-Linux-regtest-reallocarray-needs-malloc.h.patch
+Patch16: 0012-Bug-487439-SIGILL-in-JDK11-JDK17.patch
+Patch17: 0013-Don-t-leave-fds-created-with-log-file-xml-file-or-lo.patch
+Patch18: 0014-Close-both-internal-pipe-fds-after-VG_-fork-in-paren.patch
+Patch19: 0015-Don-t-allow-programs-calling-fnctl-on-valgrind-s-own.patch
+patch20: 0016-mips-skip-using-shared-syscall-numbers-for-mips64.patch
+patch21: 0017-gdbserver_tests-filters-remove-python-rpm-module-loa.patch
+patch22: 0018-Implement-VMOVQ-xmm1-xmm2-m64.patch
+patch23: 0019-arm64-Fix-fcvtas-instruction.patch
+patch24: 0020-gdbserver_tests-filters-remove-more-verbose-python-r.patch
+patch25: 0021-Avoid-dev-inode-check-on-btrfs-with-sanity-level-3.patch
 
 BuildRequires: make
 BuildRequires: glibc-devel
@@ -130,14 +139,11 @@ BuildRequires: elfutils-debuginfod-client
 Recommends: elfutils-debuginfod-client
 %endif
 
-%{?scl:Requires:%scl_runtime}
+# For running the testsuite.
+# Some of the python scripts require python 3.9+
+BuildRequires: python3-devel
 
-# We need to fixup selinux file context when doing a scl build.
-# In RHEL6 we might need to fix up the labels even though the
-# meta package sets up a fs equivalence. See post.
-%if 0%{?rhel} == 6
-%{?scl:Requires(post): /sbin/restorecon}
-%endif
+%{?scl:Requires:%scl_runtime}
 
 # We could use %%valgrind_arches as defined in redhat-rpm-config
 # But that is really for programs using valgrind, it defines the
@@ -223,32 +229,42 @@ Valgrind User Manual for details.
 
 %patch -P1 -p1
 %patch -P2 -p1
-
-# Old rhel gcc doesn't have -fstack-protector-strong.
-%if 0%{?fedora} || 0%{?rhel} >= 7
 %patch -P3 -p1
 %patch -P4 -p1
-%endif
 
 %patch -P5 -p1
+%patch -P6 -p1
+%patch -P7 -p1
+%patch -P8 -p1
+%patch -P9 -p1
+%patch -P10 -p1
+%patch -P11 -p1
+%patch -P12 -p1
+%patch -P13 -p1
+%patch -P14 -p1
+%patch -P15 -p1
+%patch -P16 -p1
+%patch -P17 -p1
+%patch -P18 -p1
+%patch -P19 -p1
+%patch -P20 -p1
+%patch -P21 -p1
+%patch -P22 -p1
+%patch -P23 -p1
+%patch -P24 -p1
+%patch -P25 -p1
 
 %build
-# LTO triggers undefined symbols in valgrind.  Valgrind has a --enable-lto
-# configure time option, but that doesn't seem to help.
-# Disable LTO for now.
+# LTO triggers undefined symbols in valgrind.  But valgrind has a
+# --enable-lto configure time option that we will use instead.
 %define _lto_cflags %{nil}
 
 # Some patches (might) touch Makefile.am or configure.ac files.
 # Just always autoreconf so we don't need patches to prebuild files.
 ./autogen.sh
 
-# Old openmpi-devel has version depended paths for mpicc.
 %if %{build_openmpi}
-%if 0%{?fedora} >= 13 || 0%{?rhel} >= 6
 %define mpiccpath %{!?scl:%{_libdir}}%{?scl:%{_root_libdir}}/openmpi/bin/mpicc
-%else
-%define mpiccpath %{!?scl:%{_libdir}}%{?scl:%{_root_libdir}}/openmpi/*/bin/mpicc
-%endif
 %else
 # We explicitly don't want the libmpi wrapper. So make sure that configure
 # doesn't pick some random mpi compiler that happens to be installed.
@@ -464,6 +480,33 @@ fi
 %endif
 
 %changelog
+* Fri Jul 12 2024 Mark Wielaard <mjw@redhat.com> - 3.23.0-4
+  Add upstream VALGRIND_3_23_BRANCH patches
+  0001-Prepare-NEWS-for-branch-3.23-fixes.patch
+  0002-486180-MIPS-VexGuestArchState-has-no-member-named-gu.patch
+  0003-Bug-486293-memccpy-false-positives.patch
+  0004-Bug-486569-linux-inotify_init-syscall-wrapper-missin.patch
+  0005-aarch64-frinta-and-frinta-vector-instructions.patch
+  0006-mips-skip-using-shared-syscall-numbers-for-mips32.patch
+  0007-Fix-uninitialized-err-in-handle_extension.patch
+  0008-Avoid-use-of-guest_IP_AT_SYSCALL-in-handle_extension.patch
+  0009-s390x-Minor-fixes-in-extension-s390x.c.patch
+  0010-Bug-453044-gbserver_tests-failures-in-aarch64.patch
+  0011-Linux-regtest-reallocarray-needs-malloc.h.patch
+  0012-Bug-487439-SIGILL-in-JDK11-JDK17.patch
+  0013-Don-t-leave-fds-created-with-log-file-xml-file-or-lo.patch
+  0014-Close-both-internal-pipe-fds-after-VG_-fork-in-paren.patch
+  0015-Don-t-allow-programs-calling-fnctl-on-valgrind-s-own.patch
+  0016-mips-skip-using-shared-syscall-numbers-for-mips64.patch
+  0017-gdbserver_tests-filters-remove-python-rpm-module-loa.patch
+  0018-Implement-VMOVQ-xmm1-xmm2-m64.patch
+  0019-arm64-Fix-fcvtas-instruction.patch
+  0020-gdbserver_tests-filters-remove-more-verbose-python-r.patch
+  0021-Avoid-dev-inode-check-on-btrfs-with-sanity-level-3.patch
+
+* Fri Apr 26 2024 Mark Wielaard <mjw@redhat.com> - 3.23.0-1
+- Upstream 3.23.0 final
+
 * Wed Dec  6 2023 Mark Wielaard <mjw@redhat.com> - 3.22.0-2
 - Add valgrind-3.22.0-rodata.patch
 

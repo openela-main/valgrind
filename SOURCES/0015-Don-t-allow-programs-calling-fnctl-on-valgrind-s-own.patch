@@ -1,0 +1,58 @@
+From 2272233d23a5431e14b3c9385d2b4b66e0e8f0fd Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Alexandra=20H=C3=A1jkov=C3=A1?= <ahajkova@redhat.com>
+Date: Thu, 20 Jun 2024 07:45:56 -0400
+Subject: [PATCH 15/15] Don't allow programs calling fnctl on valgrind's own
+ file descriptors
+
+Add a call to ML_(fd_allowed) in the PRE handler of fcntl and fcntl64
+and block syscalls with EBADF when the file descriptor isn't allowed
+to be used by the program.
+
+https://bugs.kde.org/show_bug.cgi?id=337388
+(cherry picked from commit 4b83e3d47daaf5eff2ca96867a8c790e13830eb5)
+---
+ NEWS                                | 1 +
+ coregrind/m_syswrap/syswrap-linux.c | 8 ++++++++
+ 2 files changed, 9 insertions(+)
+
+diff --git a/NEWS b/NEWS
+index 94789a04ba9e..523380a98fe5 100644
+--- a/NEWS
++++ b/NEWS
+@@ -7,6 +7,7 @@ The following bugs have been fixed or resolved on this branch.
+ 
+ 202770  open fd at exit --log-socket=127.0.0.1:1500 with --track-fds=yes
+ 311655  --log-file=FILE leads to apparent fd leak
++337388  fcntl works on Valgrind's own file descriptors
+ 453044  gbserver_tests failures in aarch64
+ 479661  Valgrind leaks file descriptors
+ 486180  [MIPS] 'VexGuestArchState' has no member named 'guest_IP_AT_SYSCALL'
+diff --git a/coregrind/m_syswrap/syswrap-linux.c b/coregrind/m_syswrap/syswrap-linux.c
+index 45413fdd9ef5..9f3c51c17948 100644
+--- a/coregrind/m_syswrap/syswrap-linux.c
++++ b/coregrind/m_syswrap/syswrap-linux.c
+@@ -6978,6 +6978,10 @@ PRE(sys_fcntl)
+    if (ARG2 == VKI_F_SETLKW)
+ #  endif
+       *flags |= SfMayBlock;
++
++   if (!ML_(fd_allowed)(ARG1, "fcntl", tid, False)) {
++     SET_STATUS_Failure (VKI_EBADF);
++   }
+ }
+ 
+ POST(sys_fcntl)
+@@ -7088,6 +7092,10 @@ PRE(sys_fcntl64)
+    if (ARG2 == VKI_F_SETLKW)
+ #  endif
+       *flags |= SfMayBlock;
++
++   if (!ML_(fd_allowed)(ARG1, "fcntl64", tid, False)) {
++     SET_STATUS_Failure (VKI_EBADF);
++   }
+ }
+ 
+ POST(sys_fcntl64)
+-- 
+2.45.2
+

@@ -1,0 +1,226 @@
+From 14cefe7c645a3148165f4b2fa6095d9446e378c7 Mon Sep 17 00:00:00 2001
+From: Mark Wielaard <mark@klomp.org>
+Date: Sun, 16 Jun 2024 21:23:08 +0200
+Subject: [PATCH 13/15] Don't leave fds created with --log-file, --xml-file or
+ --log-socket open
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+prepare_sink_fd and prepare_sink_socket will create a new file
+descriptor for the output sink. finalize_sink_fd then copies the fd
+to the safe range, so it doesn't conflict with any application fds.
+
+If we created the original fd ourselves, it was a VgLogTo_File or
+VgLogTo_Socket, not VgLogTo_Fd, finalize_sink_fd should close it.
+
+Also close socket when connecting fails in VG_(connect_via_socket).
+
+Add a testcase for --log-file and --xml-file which prints output to
+/dev/stderr
+
+https://bugs.kde.org/show_bug.cgi?id=202770
+https://bugs.kde.org/show_bug.cgi?id=311655
+https://bugs.kde.org/show_bug.cgi?id=488379
+
+Co-authored-by: Alexandra Hájková <ahajkova@redhat.com
+(cherry picked from commit fbd7596f8342f0b0fbbe088d960da839a8bdb839)
+---
+ NEWS                                |  3 ++
+ coregrind/m_libcfile.c              |  1 +
+ coregrind/m_libcprint.c             |  6 ++++
+ none/tests/Makefile.am              |  5 ++-
+ none/tests/filter_xml               | 25 +++++++++++++++
+ none/tests/log-track-fds.stderr.exp |  0
+ none/tests/log-track-fds.vgtest     |  4 +++
+ none/tests/xml-track-fds.stderr.exp | 47 +++++++++++++++++++++++++++++
+ none/tests/xml-track-fds.vgtest     |  5 +++
+ 9 files changed, 95 insertions(+), 1 deletion(-)
+ create mode 100755 none/tests/filter_xml
+ create mode 100644 none/tests/log-track-fds.stderr.exp
+ create mode 100644 none/tests/log-track-fds.vgtest
+ create mode 100644 none/tests/xml-track-fds.stderr.exp
+ create mode 100644 none/tests/xml-track-fds.vgtest
+
+diff --git a/NEWS b/NEWS
+index fbe0f012ef0c..10b5ae3195ca 100644
+--- a/NEWS
++++ b/NEWS
+@@ -5,11 +5,14 @@ Branch 3.23
+ 
+ The following bugs have been fixed or resolved on this branch.
+ 
++202770  open fd at exit --log-socket=127.0.0.1:1500 with --track-fds=yes
++311655  --log-file=FILE leads to apparent fd leak
+ 453044  gbserver_tests failures in aarch64
+ 486180  [MIPS] 'VexGuestArchState' has no member named 'guest_IP_AT_SYSCALL'
+ 486293  memccpy false positives
+ 486569  linux inotify_init syscall wrapper missing POST entry in syscall_table
+ 487439  SIGILL in JDK11, JDK17
++488379  --track-fds=yes errors that cannot be suppressed with --xml-file=
+ n-i-bz  aarch64 frinta and frinta vector instructions
+ 
+ To see details of a given bug, visit
+diff --git a/coregrind/m_libcfile.c b/coregrind/m_libcfile.c
+index 6098bc5813a8..9635b80a6869 100644
+--- a/coregrind/m_libcfile.c
++++ b/coregrind/m_libcfile.c
+@@ -1333,6 +1333,7 @@ Int VG_(connect_via_socket)( const HChar* str )
+    res = my_connect(sd, &servAddr, sizeof(servAddr));
+    if (res < 0) {
+       /* connection failed */
++      VG_(close)(sd);
+       return -2;
+    }
+ 
+diff --git a/coregrind/m_libcprint.c b/coregrind/m_libcprint.c
+index c802f814038b..593889da9d1b 100644
+--- a/coregrind/m_libcprint.c
++++ b/coregrind/m_libcprint.c
+@@ -425,6 +425,12 @@ static void finalize_sink_fd(OutputSink *sink, Int new_fd, Bool is_xml)
+    } else {
+       VG_(fcntl)(safe_fd, VKI_F_SETFD, VKI_FD_CLOEXEC);
+       sink->fd = safe_fd;
++      /* If we created the new_fd (VgLogTo_File or VgLogTo_Socket), then we
++         don't need the original file descriptor open anymore. We only need
++         to keep it open if it was an existing fd given by the user (or
++         stderr).  */
++      if (sink->type != VgLogTo_Fd)
++         VG_(close)(new_fd);
+    }
+ }
+ 
+diff --git a/none/tests/Makefile.am b/none/tests/Makefile.am
+index 185993f204bb..532cc7632a8f 100644
+--- a/none/tests/Makefile.am
++++ b/none/tests/Makefile.am
+@@ -86,6 +86,7 @@ dist_noinst_SCRIPTS = \
+ 	filter_none_discards \
+ 	filter_stderr \
+ 	filter_timestamp \
++	filter_xml \
+ 	allexec_prepare_prereq
+ 
+ noinst_HEADERS = fdleak.h
+@@ -229,7 +230,9 @@ EXTRA_DIST = \
+ 	sigprocmask.stderr.exp sigprocmask.vgtest \
+ 	socket_close.stderr.exp socket_close.vgtest \
+ 	file_dclose.stderr.exp file_dclose.vgtest \
+-	double_close_range.stderr.exp double_close_range.vgtest
++	double_close_range.stderr.exp double_close_range.vgtest \
++	log-track-fds.stderr.exp log-track-fds.vgtest \
++	xml-track-fds.stderr.exp xml-track-fds.vgtest
+ 
+ 
+ check_PROGRAMS = \
+diff --git a/none/tests/filter_xml b/none/tests/filter_xml
+new file mode 100755
+index 000000000000..d1ef570a05b0
+--- /dev/null
++++ b/none/tests/filter_xml
+@@ -0,0 +1,25 @@
++#! /bin/sh
++
++dir=`dirname $0`
++
++# FreeBSD adds this one extra line
++# but after filter_xml_frames it will just be <path>...<\/path>
++# which matches other lines, so get rid of it while we can
++# uniquely match it
++sed "/<path>internet<\/path>/d" |
++
++$dir/../../tests/filter_xml_frames  |
++perl    -p -e "s/<time>.*<\/time>/<time>...<\/time>/s" |
++perl    -p -e "s/<what>.*<\/what>/<what>...<\/what>/s" |
++perl    -p -e "s/<path>.*<\/path>/<path>...<\/path>/s" |
++perl    -p -e "s/<line>Copyright.*<\/line>/<line>Copyright...<\/line>/s" |
++perl    -p -e "s/<line>Using Valgrind.*<\/line>/<line>Using Valgrind...<\/line>/s" |
++sed "s/<ppid>[0-9]*<\/ppid>/<ppid>...<\/ppid>/" |
++sed "s/<tid>[0-9]*<\/tid>/<tid>...<\/tid>/" |
++sed "s/<pid>[0-9]*<\/pid>/<pid>...<\/pid>/" |
++sed "s/<obj>.*<\/obj>/<obj>...<\/obj>/" |
++sed "s/<exe>.*<\/exe>/<exe>...<\/exe>/" |
++sed "s/<dir>.*<\/dir>/<dir>...<\/dir>/" |
++sed "s/<ppid>[0-9]*<\/ppid>/<ppid>...<\/ppid>/" |
++sed "s/<unique>0x[0-9a-fA-F]*<\/unique>/<unique>0x........<\/unique>/" |
++sed "s/<ip>0x[0-9a-fA-F]*<\/ip>/<ip>0x........<\/ip>/"
+diff --git a/none/tests/log-track-fds.stderr.exp b/none/tests/log-track-fds.stderr.exp
+new file mode 100644
+index 000000000000..e69de29bb2d1
+diff --git a/none/tests/log-track-fds.vgtest b/none/tests/log-track-fds.vgtest
+new file mode 100644
+index 000000000000..dfebb5bf3e8e
+--- /dev/null
++++ b/none/tests/log-track-fds.vgtest
+@@ -0,0 +1,4 @@
++# Simple test to make sure track-fds doesn't error on (internal) log-file
++# See https://bugs.kde.org/show_bug.cgi?id=311655
++prog: ../../tests/true
++vgopts: -q --track-fds=yes --log-file=/dev/stderr
+diff --git a/none/tests/xml-track-fds.stderr.exp b/none/tests/xml-track-fds.stderr.exp
+new file mode 100644
+index 000000000000..b06da9d72252
+--- /dev/null
++++ b/none/tests/xml-track-fds.stderr.exp
+@@ -0,0 +1,47 @@
++<?xml version="1.0"?>
++
++<valgrindoutput>
++
++<protocolversion>5</protocolversion>
++<protocoltool>none</protocoltool>
++
++<preamble>
++  <line>Nulgrind, the minimal Valgrind tool</line>
++  <line>Copyright...</line>
++  <line>Using Valgrind...</line>
++  <line>Command: ./../../tests/true</line>
++</preamble>
++
++<pid>...</pid>
++<ppid>...</ppid>
++<tool>none</tool>
++
++<args>
++  <vargv>
++    <exe>...</exe>
++    <arg>--command-line-only=yes</arg>
++    <arg>--memcheck:leak-check=no</arg>
++    <arg>--tool=none</arg>
++    <arg>--track-fds=yes</arg>
++    <arg>--xml=yes</arg>
++    <arg>--xml-file=/dev/stderr</arg>
++  </vargv>
++  <argv>
++    <exe>...</exe>
++  </argv>
++</args>
++
++<status>
++  <state>RUNNING</state>
++  <time>...</time>
++</status>
++
++
++<status>
++  <state>FINISHED</state>
++  <time>...</time>
++</status>
++
++
++</valgrindoutput>
++
+diff --git a/none/tests/xml-track-fds.vgtest b/none/tests/xml-track-fds.vgtest
+new file mode 100644
+index 000000000000..50f1a55a82f3
+--- /dev/null
++++ b/none/tests/xml-track-fds.vgtest
+@@ -0,0 +1,5 @@
++# Simple test to make sure track-fds doesn't error on (internal) xml-file
++# See https://bugs.kde.org/show_bug.cgi?id=488379
++prog: ../../tests/true
++vgopts: --track-fds=yes --xml=yes --xml-file=/dev/stderr
++stderr_filter: filter_xml
+-- 
+2.45.2
+

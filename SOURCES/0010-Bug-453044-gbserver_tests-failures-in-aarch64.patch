@@ -1,0 +1,38 @@
+From 70d765faa162f2f12e7771db51877649637f2c12 Mon Sep 17 00:00:00 2001
+From: Jesus Checa <jcheca@redhat.com>
+Date: Sat, 25 May 2024 12:40:30 +0200
+Subject: [PATCH 10/11] Bug 453044 - gbserver_tests failures in aarch64
+
+(cherry picked from commit 790abdf7d3f3df0c968605b68ca765310689b7ce)
+---
+ NEWS                          | 1 +
+ gdbserver_tests/filter_gdb.in | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/NEWS b/NEWS
+index adb52169dd87..c2ad6a207d96 100644
+--- a/NEWS
++++ b/NEWS
+@@ -5,6 +5,7 @@ Branch 3.23
+ 
+ The following bugs have been fixed or resolved on this branch.
+ 
++453044  gbserver_tests failures in aarch64
+ 486180  [MIPS] 'VexGuestArchState' has no member named 'guest_IP_AT_SYSCALL'
+ 486293  memccpy false positives
+ 486569  linux inotify_init syscall wrapper missing POST entry in syscall_table
+diff --git a/gdbserver_tests/filter_gdb.in b/gdbserver_tests/filter_gdb.in
+index 4118063f6bc6..497171732b25 100755
+--- a/gdbserver_tests/filter_gdb.in
++++ b/gdbserver_tests/filter_gdb.in
+@@ -152,6 +152,7 @@ s/in _select ()/in syscall .../
+ /sysv\/linux\/generic\/select.c/d
+ /return SYSCALL_CANCEL /d
+ /r = SYSCALL_CANCEL /d
++/result = SYSCALL_CANCEL /d
+ 
+ #       a more specialised system call select stack trace part
+ #             (on 32 bits, we have an int_80, on 64 bits, directly select)
+-- 
+2.45.2
+
