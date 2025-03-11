@@ -3,7 +3,7 @@
 Summary: Dynamic analysis tools to detect memory or thread bugs and profile
 Name: %{?scl_prefix}valgrind
 Version: 3.22.0
-Release: 2%{?dist}
+Release: 3%{?dist}
 Epoch: 1
 License: GPLv2+
 URL: https://www.valgrind.org/
@@ -131,6 +131,11 @@ BuildRequires: elfutils-debuginfod-client
 Recommends: elfutils-debuginfod-client
 %endif
 
+# Optional subpackages
+Recommends: %{?scl_prefix}valgrind-docs = %{epoch}:%{version}-%{release}
+Recommends: %{?scl_prefix}valgrind-scripts = %{epoch}:%{version}-%{release}
+Recommends: %{?scl_prefix}valgrind-gdb = %{epoch}:%{version}-%{release}
+
 # Some of the python scripts require python 3.9+
 BuildRequires: python3.11
 BuildRequires: python3.11-rpm-macros
@@ -198,10 +203,42 @@ profiler (callgrind), and a heap profiler (massif).
 %package devel
 Summary: Development files for valgrind aware programs
 Group: Development/Debuggers
-Requires: %{?scl_prefix}valgrind = %{epoch}:%{version}-%{release}
+# These are just the header files, so strictly speaking you don't
+# need valgrind itself unless you are testing your builds. This used
+# to be a Requires, so people might depend on the package pulling in
+# the core valgrind package, so make it at least a weak dependency.
+Recommends: %{?scl_prefix}valgrind = %{epoch}:%{version}-%{release}
 
 %description devel
 Header files and libraries for development of valgrind aware programs.
+
+%package docs
+Summary: Documentation for valgrind tools, scripts and gdb integration
+License: GFDL-1.2-or-later
+
+%description docs
+Documentation in html and pdf, plus man pages for valgrind tools and scripts.
+
+%package scripts
+Summary: Scripts for post-processing valgrind tool output
+License: GPL-2.0-or-later
+# Most scripts can be used as is for post-processing a valgrind tool run.
+# But callgrind_control uses vgdb.
+Recommends: %{?scl_prefix}valgrind-gdb = %{epoch}:%{version}-%{release}
+
+%description scripts
+Perl and Python scripts for post-processing valgrind tool output.
+
+%package gdb
+Summary: Tools for integrating valgrind and gdb
+License: GPL-2.0-or-later
+Requires: %{?scl_prefix}valgrind = %{epoch}:%{version}-%{release}
+# vgdb can be used without gdb, just to control valgrind.
+# But normally you use it together with both valgrind and gdb.
+Recommends: gdb
+
+%description gdb
+Tools and support files for integrating valgrind and gdb.
 
 %if %{build_tools_devel}
 %package tools-devel
@@ -411,18 +448,41 @@ echo ===============END TESTING===============
 %{!?_licensedir:%global license %%doc}
 
 %files
-%license COPYING COPYING.DOCS
-%doc NEWS README_*
-%doc docs/installed/html docs/installed/*.pdf
-%{_bindir}/*
+%license COPYING
+%{_bindir}/valgrind
 %dir %{_libexecdir}/valgrind
-# Install everything in the libdir except the .so.
-# The vgpreload so files might need file mode adjustment.
-%{_libexecdir}/valgrind/*[^o]
+# Install just the core tools, default suppression and vgpreload libraries.
+%{_libexecdir}/valgrind/default.supp
+%{_libexecdir}/valgrind/*-*-linux
 # Turn on executable bit again for vgpreload libraries.
 # Was disabled in %%install to prevent debuginfo stripping.
-%attr(0755,root,root) %{_libexecdir}/valgrind/vgpreload*-%{valarch}-*so
+%attr(0755,root,root) %{_libexecdir}/valgrind/vgpreload_*-%{valarch}-linux.so
+
+%files docs
+%license COPYING.DOCS
+%doc NEWS README_*
+%doc docs/installed/html docs/installed/*.pdf
 %{_mandir}/man1/*
+
+%files scripts
+%license COPYING
+%{_bindir}/callgrind_annotate
+%{_bindir}/callgrind_control
+%{_bindir}/cg_annotate
+%{_bindir}/cg_diff
+%{_bindir}/cg_merge
+%{_bindir}/ms_print
+%{_libexecdir}/valgrind/dh_view.css
+%{_libexecdir}/valgrind/dh_view.html
+%{_libexecdir}/valgrind/dh_view.js
+
+%files gdb
+%license COPYING
+%{_bindir}/valgrind-di-server
+%{_bindir}/valgrind-listener
+%{_bindir}/vgdb
+# gdb register descriptions
+%{_libexecdir}/valgrind/*.xml
 
 %files devel
 %dir %{_includedir}/valgrind
@@ -466,6 +526,19 @@ fi
 %endif
 
 %changelog
+* Fri Jan 24 2025 Mark Wielaard <mjw@redhat.com> - 3.22.0-3
+- Split main valgrind package into several subpackages:
+  - valgrind now contains just the core tools.
+  - valgrind-scripts contains the post-processing scripts for callgrind,
+    cachegrind, massif and dhat which depend on perl and python.
+  - valgrind-gdb contains the debuginfo client/server and (v)gdb support.
+  - valgrind-docs contains the man pages, html and pdf manual.
+- Adjust Requires/Recommends to subpackages can be installed independently.
+  - valgrind-devel now Recommends, instead of Requires, valgrind.
+  - valgrind-gdb Requires valgrind
+  - valgrind-scripts Recommends valgrind-gdb
+  - valgrind-gdb Recommends gdb
+
 * Wed Dec  6 2023 Mark Wielaard <mjw@redhat.com> - 3.22.0-2
 - Add valgrind-3.22.0-rodata.patch
 
