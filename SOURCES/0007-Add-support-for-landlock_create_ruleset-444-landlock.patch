@@ -1,0 +1,358 @@
+From 3d72dd780be97bd19331403da60908f295712fc7 Mon Sep 17 00:00:00 2001
+From: Peter Seiderer <ps.report@gmx.net>
+Date: Mon, 8 Jul 2024 11:05:47 +0200
+Subject: [PATCH 07/11] Add support for landlock_create_ruleset (444),
+ landlock_add_rule (445) and landlock_restrict_self (446) syscalls
+
+- add support for landlock_create_ruleset (444) syscall
+- add support for landlock_add_rule (445) syscall
+- add support for landlock_restrict_self (446) syscall
+
+https://bugs.kde.org/show_bug.cgi?id=489913
+
+Signed-off-by: Peter Seiderer <ps.report@gmx.net>
+
+(cherry picked from commit b1453546fe7396e7d4b4b2fc8ec7e64b71d18611)
+---
+ NEWS                                         |  2 +
+ coregrind/m_syswrap/priv_syswrap-linux.h     |  5 ++
+ coregrind/m_syswrap/syswrap-amd64-linux.c    |  4 ++
+ coregrind/m_syswrap/syswrap-arm-linux.c      |  4 ++
+ coregrind/m_syswrap/syswrap-arm64-linux.c    |  4 ++
+ coregrind/m_syswrap/syswrap-linux.c          | 48 ++++++++++++++++++++
+ coregrind/m_syswrap/syswrap-mips32-linux.c   |  4 ++
+ coregrind/m_syswrap/syswrap-mips64-linux.c   |  5 +-
+ coregrind/m_syswrap/syswrap-nanomips-linux.c |  3 ++
+ coregrind/m_syswrap/syswrap-ppc32-linux.c    |  4 ++
+ coregrind/m_syswrap/syswrap-ppc64-linux.c    |  4 ++
+ coregrind/m_syswrap/syswrap-s390x-linux.c    |  4 ++
+ coregrind/m_syswrap/syswrap-x86-linux.c      |  4 ++
+ include/Makefile.am                          |  3 +-
+ include/pub_tool_vki.h                       |  1 +
+ include/vki/vki-linux-landlock.h             | 37 +++++++++++++++
+ include/vki/vki-scnums-shared-linux.h        |  4 ++
+ 17 files changed, 138 insertions(+), 2 deletions(-)
+ create mode 100644 include/vki/vki-linux-landlock.h
+
+diff --git a/NEWS b/NEWS
+index 8362e1d2df41..68cd0c6fa603 100644
+--- a/NEWS
++++ b/NEWS
+@@ -5,6 +5,8 @@ Branch 3.24
+ 
+ The following bugs have been fixed or resolved on this branch.
+ 
++489913  WARNING: unhandled amd64-linux syscall: 444 (landlock_create_ruleset)
++
+ To see details of a given bug, visit
+   https://bugs.kde.org/show_bug.cgi?id=XXXXXX
+ where XXXXXX is the bug number as listed above.
+diff --git a/coregrind/m_syswrap/priv_syswrap-linux.h b/coregrind/m_syswrap/priv_syswrap-linux.h
+index d50cdcc981b9..221439a0ec33 100644
+--- a/coregrind/m_syswrap/priv_syswrap-linux.h
++++ b/coregrind/m_syswrap/priv_syswrap-linux.h
+@@ -328,6 +328,11 @@ DECL_TEMPLATE(linux, sys_pidfd_open);
+ DECL_TEMPLATE(linux, sys_close_range);
+ DECL_TEMPLATE(linux, sys_openat2);
+ 
++// Linux-specific (new in Linux 5.13)
++DECL_TEMPLATE(linux, sys_landlock_create_ruleset)
++DECL_TEMPLATE(linux, sys_landlock_add_rule)
++DECL_TEMPLATE(linux, sys_landlock_restrict_self)
++
+ // Linux-specific (new in Linux 5.14)
+ DECL_TEMPLATE(linux, sys_memfd_secret);
+ 
+diff --git a/coregrind/m_syswrap/syswrap-amd64-linux.c b/coregrind/m_syswrap/syswrap-amd64-linux.c
+index 2230baf772b0..9488d3090e80 100644
+--- a/coregrind/m_syswrap/syswrap-amd64-linux.c
++++ b/coregrind/m_syswrap/syswrap-amd64-linux.c
+@@ -887,6 +887,10 @@ static SyscallTableEntry syscall_table[] = {
+ 
+    LINXY(__NR_epoll_pwait2,      sys_epoll_pwait2),      // 441
+ 
++   LINXY(__NR_landlock_create_ruleset, sys_landlock_create_ruleset), // 444
++   LINX_(__NR_landlock_add_rule,       sys_landlock_add_rule),       // 445
++   LINX_(__NR_landlock_restrict_self,  sys_landlock_restrict_self),  // 446
++
+    LINXY(__NR_memfd_secret,      sys_memfd_secret),      // 447
+ 
+    LINX_(__NR_fchmodat2,         sys_fchmodat2),         // 452
+diff --git a/coregrind/m_syswrap/syswrap-arm-linux.c b/coregrind/m_syswrap/syswrap-arm-linux.c
+index d326fdb9eeda..65f64af99bb7 100644
+--- a/coregrind/m_syswrap/syswrap-arm-linux.c
++++ b/coregrind/m_syswrap/syswrap-arm-linux.c
+@@ -1062,6 +1062,10 @@ static SyscallTableEntry syscall_main_table[] = {
+ 
+    LINXY(__NR_epoll_pwait2,      sys_epoll_pwait2),      // 441
+ 
++   LINXY(__NR_landlock_create_ruleset, sys_landlock_create_ruleset), // 444
++   LINX_(__NR_landlock_add_rule,       sys_landlock_add_rule),       // 445
++   LINX_(__NR_landlock_restrict_self,  sys_landlock_restrict_self),  // 446
++
+    LINX_(__NR_fchmodat2,         sys_fchmodat2),         // 452
+ };
+ 
+diff --git a/coregrind/m_syswrap/syswrap-arm64-linux.c b/coregrind/m_syswrap/syswrap-arm64-linux.c
+index 05e0e421fa6c..151ae0640b10 100644
+--- a/coregrind/m_syswrap/syswrap-arm64-linux.c
++++ b/coregrind/m_syswrap/syswrap-arm64-linux.c
+@@ -840,6 +840,10 @@ static SyscallTableEntry syscall_main_table[] = {
+ 
+    LINXY(__NR_epoll_pwait2,      sys_epoll_pwait2),      // 441
+ 
++   LINXY(__NR_landlock_create_ruleset, sys_landlock_create_ruleset), // 444
++   LINX_(__NR_landlock_add_rule,       sys_landlock_add_rule),       // 445
++   LINX_(__NR_landlock_restrict_self,  sys_landlock_restrict_self),  // 446
++
+    LINXY(__NR_memfd_secret,      sys_memfd_secret),      // 447
+ 
+    LINX_(__NR_fchmodat2,         sys_fchmodat2),         // 452
+diff --git a/coregrind/m_syswrap/syswrap-linux.c b/coregrind/m_syswrap/syswrap-linux.c
+index eec8388224ba..70ae837a9454 100644
+--- a/coregrind/m_syswrap/syswrap-linux.c
++++ b/coregrind/m_syswrap/syswrap-linux.c
+@@ -4163,6 +4163,54 @@ POST(sys_memfd_create)
+    }
+ }
+ 
++PRE(sys_landlock_create_ruleset)
++{
++   PRINT("sys_landlock_create_ruleset ( %#" FMT_REGWORD "x, %lu, %lu )",
++         ARG1, ARG2, ARG3);
++   PRE_REG_READ3(long, "landlock_create_ruleset",
++                 const struct vki_landlock_ruleset_attr*, attr,
++                 vki_size_t, size, vki_uint32_t, flags);
++   PRE_MEM_READ( "landlock_create_ruleset(value)", ARG1, ARG2 );
++
++   /* XXX Alternatively we could always fail with EOPNOTSUPP
++      since the rules might interfere with valgrind itself.  */
++}
++
++POST(sys_landlock_create_ruleset)
++{
++   /* Returns either the abi version or a file descriptor.  */
++   if (ARG3 != VKI_LANDLOCK_CREATE_RULESET_VERSION) {
++      if (!ML_(fd_allowed)(RES, "landlock_create_ruleset", tid, True)) {
++         VG_(close)(RES);
++         SET_STATUS_Failure( VKI_EMFILE );
++      } else {
++         if (VG_(clo_track_fds))
++            ML_(record_fd_open_nameless)(tid, RES);
++      }
++   }
++}
++
++PRE(sys_landlock_add_rule)
++{
++   PRINT("sys_landlock_add_rule ( %ld, %lu, %#" FMT_REGWORD "x, %lu )",
++         SARG1, ARG2, ARG3, ARG4);
++   PRE_REG_READ4(long, "landlock_add_rule",
++                 int, ruleset_fd, enum vki_landlock_rule_type, rule_type,
++                 const void*, rule_attr, vki_uint32_t, flags);
++   if (!ML_(fd_allowed)(ARG1, "landlock_add_rule", tid, False))
++      SET_STATUS_Failure(VKI_EBADF);
++   /* XXX Depending on rule_type we should also check the given rule_attr.  */
++}
++
++PRE(sys_landlock_restrict_self)
++{
++   PRINT("sys_landlock_restrict_self ( %ld, %lu )", SARG1, ARG2);
++   PRE_REG_READ2(long, "landlock_create_ruleset",
++                 int, ruleset_fd, vki_uint32_t, flags);
++   if (!ML_(fd_allowed)(ARG1, "landlock_restrict_self", tid, False))
++      SET_STATUS_Failure(VKI_EBADF);
++}
++
+ PRE(sys_memfd_secret)
+ {
+    PRINT("sys_memfd_secret ( %#" FMT_REGWORD "x )", ARG1);
+diff --git a/coregrind/m_syswrap/syswrap-mips32-linux.c b/coregrind/m_syswrap/syswrap-mips32-linux.c
+index 421344213676..757b637ba986 100644
+--- a/coregrind/m_syswrap/syswrap-mips32-linux.c
++++ b/coregrind/m_syswrap/syswrap-mips32-linux.c
+@@ -1147,6 +1147,10 @@ static SyscallTableEntry syscall_main_table[] = {
+ 
+    LINXY(__NR_epoll_pwait2,      sys_epoll_pwait2),      // 441
+ 
++   LINXY(__NR_landlock_create_ruleset, sys_landlock_create_ruleset), // 444
++   LINX_(__NR_landlock_add_rule,       sys_landlock_add_rule),       // 445
++   LINX_(__NR_landlock_restrict_self,  sys_landlock_restrict_self),  // 446
++
+    LINX_(__NR_fchmodat2,               sys_fchmodat2),               // 452
+ };
+ 
+diff --git a/coregrind/m_syswrap/syswrap-mips64-linux.c b/coregrind/m_syswrap/syswrap-mips64-linux.c
+index e9bb5c54c59c..f0c5f7e04f4e 100644
+--- a/coregrind/m_syswrap/syswrap-mips64-linux.c
++++ b/coregrind/m_syswrap/syswrap-mips64-linux.c
+@@ -824,7 +824,10 @@ static SyscallTableEntry syscall_main_table[] = {
+    LINXY (__NR_openat2, sys_openat2),
+    LINXY (__NR_pidfd_getfd, sys_pidfd_getfd),
+    LINX_ (__NR_faccessat2, sys_faccessat2),
+-   LINXY(__NR_epoll_pwait2, sys_epoll_pwait2),
++   LINXY (__NR_epoll_pwait2, sys_epoll_pwait2),
++   LINXY (__NR_landlock_create_ruleset, sys_landlock_create_ruleset),
++   LINX_ (__NR_landlock_add_rule, sys_landlock_add_rule),
++   LINX_ (__NR_landlock_restrict_self, sys_landlock_restrict_self),
+    LINX_ (__NR_fchmodat2, sys_fchmodat2),
+ };
+ 
+diff --git a/coregrind/m_syswrap/syswrap-nanomips-linux.c b/coregrind/m_syswrap/syswrap-nanomips-linux.c
+index 36a5c0ca002d..f466aca147e0 100644
+--- a/coregrind/m_syswrap/syswrap-nanomips-linux.c
++++ b/coregrind/m_syswrap/syswrap-nanomips-linux.c
+@@ -831,6 +831,9 @@ static SyscallTableEntry syscall_main_table[] = {
+    LINXY(__NR_pidfd_getfd,             sys_pidfd_getfd),
+    LINX_ (__NR_faccessat2,             sys_faccessat2),
+    LINXY (__NR_epoll_pwait2,           sys_epoll_pwait2),
++   LINXY (__NR_landlock_create_ruleset,sys_landlock_create_ruleset),
++   LINX_ (__NR_landlock_add_rule,      sys_landlock_add_rule),
++   LINX_ (__NR_landlock_restrict_self, sys_landlock_restrict_self),
+    LINX_ (__NR_fchmodat2,              sys_fchmodat2),
+ };
+ 
+diff --git a/coregrind/m_syswrap/syswrap-ppc32-linux.c b/coregrind/m_syswrap/syswrap-ppc32-linux.c
+index f7a90c753060..634f288ce0d1 100644
+--- a/coregrind/m_syswrap/syswrap-ppc32-linux.c
++++ b/coregrind/m_syswrap/syswrap-ppc32-linux.c
+@@ -1069,6 +1069,10 @@ static SyscallTableEntry syscall_table[] = {
+ 
+    LINXY (__NR_epoll_pwait2,     sys_epoll_pwait2),      // 441
+ 
++   LINXY(__NR_landlock_create_ruleset, sys_landlock_create_ruleset), // 444
++   LINX_(__NR_landlock_add_rule,       sys_landlock_add_rule),       // 445
++   LINX_(__NR_landlock_restrict_self,  sys_landlock_restrict_self),  // 446
++
+    LINX_ (__NR_fchmodat2,        sys_fchmodat2),         // 452
+ };
+ 
+diff --git a/coregrind/m_syswrap/syswrap-ppc64-linux.c b/coregrind/m_syswrap/syswrap-ppc64-linux.c
+index 8de95624fa7c..2c2def330ad7 100644
+--- a/coregrind/m_syswrap/syswrap-ppc64-linux.c
++++ b/coregrind/m_syswrap/syswrap-ppc64-linux.c
+@@ -1035,6 +1035,10 @@ static SyscallTableEntry syscall_table[] = {
+ 
+    LINXY (__NR_epoll_pwait2,     sys_epoll_pwait2),      // 441
+ 
++   LINXY(__NR_landlock_create_ruleset, sys_landlock_create_ruleset), // 444
++   LINX_(__NR_landlock_add_rule,       sys_landlock_add_rule),       // 445
++   LINX_(__NR_landlock_restrict_self,  sys_landlock_restrict_self),  // 446
++
+    LINX_ (__NR_fchmodat2,        sys_fchmodat2),         // 452
+ };
+ 
+diff --git a/coregrind/m_syswrap/syswrap-s390x-linux.c b/coregrind/m_syswrap/syswrap-s390x-linux.c
+index 8a1be8cbef54..ca571f0f1a7c 100644
+--- a/coregrind/m_syswrap/syswrap-s390x-linux.c
++++ b/coregrind/m_syswrap/syswrap-s390x-linux.c
+@@ -875,6 +875,10 @@ static SyscallTableEntry syscall_table[] = {
+ 
+    LINXY(__NR_epoll_pwait2, sys_epoll_pwait2),                        // 441
+ 
++   LINXY(__NR_landlock_create_ruleset, sys_landlock_create_ruleset),  // 444
++   LINX_(__NR_landlock_add_rule,       sys_landlock_add_rule),        // 445
++   LINX_(__NR_landlock_restrict_self,  sys_landlock_restrict_self),   // 446
++
+    LINXY(__NR_memfd_secret, sys_memfd_secret),                        // 447
+ 
+    LINX_ (__NR_fchmodat2, sys_fchmodat2),                             // 452
+diff --git a/coregrind/m_syswrap/syswrap-x86-linux.c b/coregrind/m_syswrap/syswrap-x86-linux.c
+index 31243a0db373..a23743743abe 100644
+--- a/coregrind/m_syswrap/syswrap-x86-linux.c
++++ b/coregrind/m_syswrap/syswrap-x86-linux.c
+@@ -1656,6 +1656,10 @@ static SyscallTableEntry syscall_table[] = {
+ 
+    LINXY(__NR_epoll_pwait2,      sys_epoll_pwait2),     // 441
+ 
++   LINXY(__NR_landlock_create_ruleset, sys_landlock_create_ruleset), // 444
++   LINX_(__NR_landlock_add_rule,       sys_landlock_add_rule),       // 445
++   LINX_(__NR_landlock_restrict_self,  sys_landlock_restrict_self),  // 446
++
+    LINXY(__NR_memfd_secret,      sys_memfd_secret),      // 447
+ 
+    LINX_(__NR_fchmodat2,         sys_fchmodat2),         // 452
+diff --git a/include/Makefile.am b/include/Makefile.am
+index 8012d73749b3..5d5162a46eb6 100644
+--- a/include/Makefile.am
++++ b/include/Makefile.am
+@@ -107,4 +107,5 @@ nobase_pkginclude_HEADERS = \
+ 	vki/vki-xen-xsm.h		\
+ 	vki/vki-xen-x86.h		\
+ 	vki/vki-linux-drm.h		\
+-	vki/vki-linux-io_uring.h
++	vki/vki-linux-io_uring.h	\
++	vki/vki-linux-landlock.h
+diff --git a/include/pub_tool_vki.h b/include/pub_tool_vki.h
+index 24f99cc09f16..7b6e71e11eb4 100644
+--- a/include/pub_tool_vki.h
++++ b/include/pub_tool_vki.h
+@@ -47,6 +47,7 @@
+ #  include "vki/vki-linux.h"
+ #  include "vki/vki-linux-drm.h"
+ #  include "vki/vki-linux-io_uring.h"
++#  include "vki/vki-linux-landlock.h"
+ #elif defined(VGO_darwin)
+ #  include "vki/vki-darwin.h"
+ #elif defined(VGO_solaris)
+diff --git a/include/vki/vki-linux-landlock.h b/include/vki/vki-linux-landlock.h
+new file mode 100644
+index 000000000000..e549ae93eff9
+--- /dev/null
++++ b/include/vki/vki-linux-landlock.h
+@@ -0,0 +1,37 @@
++/*
++   This file is part of Valgrind, a dynamic binary instrumentation framework.
++
++   Copyright (C) 2024 Peter Seiderer <ps.report@gmx.net>
++
++   This program is free software; you can redistribute it and/or
++   modify it under the terms of the GNU General Public License as
++   published by the Free Software Foundation; either version 2 of the
++   License, or (at your option) any later version.
++
++   This program is distributed in the hope that it will be useful, but
++   WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, see <http://www.gnu.org/licenses/>.
++
++   The GNU General Public License is contained in the file COPYING.
++*/
++#ifndef __VKI_LANDLOCK_H
++#define __VKI_LANDLOCK_H
++
++// Derived from linux-6.9.7/include/uapi/linux/landlock.h
++struct vki_landlock_ruleset_attr {
++	__vki_u64 handled_access_fs;
++	__vki_u64 handled_access_net;
++};
++
++enum vki_landlock_rule_type {
++	VKI_LANDLOCK_RULE_PATH_BENEATH = 1,
++	VKI_LANDLOCK_RULE_NET_PORT,
++};
++
++#define VKI_LANDLOCK_CREATE_RULESET_VERSION 1
++
++#endif
+diff --git a/include/vki/vki-scnums-shared-linux.h b/include/vki/vki-scnums-shared-linux.h
+index 068a2cd12bd6..20346ca71678 100644
+--- a/include/vki/vki-scnums-shared-linux.h
++++ b/include/vki/vki-scnums-shared-linux.h
+@@ -48,6 +48,10 @@
+ 
+ #define __NR_epoll_pwait2		441
+ 
++#define __NR_landlock_create_ruleset	444
++#define __NR_landlock_add_rule		445
++#define __NR_landlock_restrict_self	446
++
+ #define __NR_memfd_secret		447
+ 
+ #define __NR_fchmodat2		452
+-- 
+2.47.0
+

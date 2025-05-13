@@ -1,0 +1,491 @@
+From ba15b8fe7d6fabfb73424a616de18a752a56430a Mon Sep 17 00:00:00 2001
+From: Mark Wielaard <mark@klomp.org>
+Date: Sat, 23 Nov 2024 21:28:13 +0100
+Subject: [PATCH 05/11] Add exp and supp patterns for missing main frame for
+ ppc64le
+
+In some cases on ppc64le we are missing the main frame.
+Add alternative .exp-ppc64le variants for socket_close_xml,
+fdleak_cmsg_xml and fdleak_ipv4_xml. And extra suppressions
+without a main frame for fdleak_cmsg_supp.
+
+See also commit 04d30049b "Filter away "main" differences in filter_fdleak"
+
+(cherry picked from commit e6960c2e41b103ab8d393cbe13dc6473fb89bffc)
+---
+ none/tests/fdleak_cmsg_supp.supp              |  47 ++++++
+ none/tests/fdleak_cmsg_xml.stderr.exp-ppc64le | 147 ++++++++++++++++++
+ none/tests/fdleak_ipv4_xml.stderr.exp-ppc64le | 139 +++++++++++++++++
+ .../tests/socket_close_xml.stderr.exp-ppc64le |  98 ++++++++++++
+ 4 files changed, 431 insertions(+)
+ create mode 100644 none/tests/fdleak_cmsg_xml.stderr.exp-ppc64le
+ create mode 100644 none/tests/fdleak_ipv4_xml.stderr.exp-ppc64le
+ create mode 100644 none/tests/socket_close_xml.stderr.exp-ppc64le
+
+diff --git a/none/tests/fdleak_cmsg_supp.supp b/none/tests/fdleak_cmsg_supp.supp
+index 92fbacabdb78..a169fd888bcc 100644
+--- a/none/tests/fdleak_cmsg_supp.supp
++++ b/none/tests/fdleak_cmsg_supp.supp
+@@ -12,6 +12,13 @@
+    fun:server
+    fun:main
+ }
++{
++   sup2-ppc64le
++   CoreError:FdNotClosed
++   fun:socket
++   fun:server
++   #fun:main
++}
+ {
+    sup3
+    CoreError:FdNotClosed
+@@ -42,3 +49,43 @@
+    fun:client
+    fun:main
+ }
++{
++   sup6-ppc64le
++   CoreError:FdNotClosed
++   fun:socket
++   fun:client
++   #fun:main
++}
++{
++   sup7
++   CoreError:FdNotClosed
++   fun:_so_socket
++   fun:__xnet_socket
++   fun:client
++   fun:main
++}
++{
++   sup8
++   CoreError:FdNotClosed
++   fun:__so_recvmsg
++   fun:__xnet_recvmsg
++   fun:client
++   fun:main
++}
++{
++   sup9
++   CoreError:FdNotClosed
++   fun:_so_socket
++   fun:__xnet_socket
++   fun:server
++   fun:main
++}
++{
++   sup10
++   CoreError:FdNotClosed
++   fun:__so_accept
++   fun:accept
++   fun:server
++   fun:main
++}
++
+diff --git a/none/tests/fdleak_cmsg_xml.stderr.exp-ppc64le b/none/tests/fdleak_cmsg_xml.stderr.exp-ppc64le
+new file mode 100644
+index 000000000000..6294094eb92e
+--- /dev/null
++++ b/none/tests/fdleak_cmsg_xml.stderr.exp-ppc64le
+@@ -0,0 +1,147 @@
++<?xml version="1.0"?>
++
++<valgrindoutput>
++
++<protocolversion>5</protocolversion>
++<protocoltool>none</protocoltool>
++
++<preamble>
++  <line>Nulgrind, the minimal Valgrind tool</line>
++  <line>Copyright...</line>
++  <line>Using Valgrind...</line>
++  <line>Command: ./fdleak_cmsg</line>
++</preamble>
++
++<pid>...</pid>
++<ppid>...</ppid>
++<tool>none</tool>
++
++<args>
++  <vargv>
++    <exe>...</exe>
++    <arg>--command-line-only=yes</arg>
++    <arg>--memcheck:leak-check=no</arg>
++    <arg>--tool=none</arg>
++    <arg>--track-fds=all</arg>
++    <arg>--xml=yes</arg>
++    <arg>--xml-fd=2</arg>
++    <arg>--child-silent-after-fork=yes</arg>
++  </vargv>
++  <argv>
++    <exe>...</exe>
++  </argv>
++</args>
++
++<status>
++  <state>RUNNING</state>
++  <time>...</time>
++</status>
++
++
++<status>
++  <state>FINISHED</state>
++  <time>...</time>
++</status>
++
++<error>
++  <unique>0x........</unique>
++  <tid>...</tid>
++  <kind>FdNotClosed</kind>
++  <fd>5</fd>
++  <path>...</path>
++  <what>...</what>
++  <stack>
++    <frame>
++      <ip>0x........</ip>
++      <obj>...</obj>
++      <fn>client</fn>
++      <dir>...</dir>
++      <file>fdleak_cmsg.c</file>
++      <line>133</line>
++    </frame>
++    <frame>
++      <ip>0x........</ip>
++      <obj>...</obj>
++      <fn>main</fn>
++      <dir>...</dir>
++      <file>fdleak_cmsg.c</file>
++      <line>174</line>
++    </frame>
++  </stack>
++</error>
++
++<error>
++  <unique>0x........</unique>
++  <tid>...</tid>
++  <kind>FdNotClosed</kind>
++  <fd>4</fd>
++  <path>...</path>
++  <what>...</what>
++  <stack>
++    <frame>
++      <ip>0x........</ip>
++      <obj>...</obj>
++      <fn>client</fn>
++      <dir>...</dir>
++      <file>fdleak_cmsg.c</file>
++      <line>133</line>
++    </frame>
++    <frame>
++      <ip>0x........</ip>
++      <obj>...</obj>
++      <fn>main</fn>
++      <dir>...</dir>
++      <file>fdleak_cmsg.c</file>
++      <line>174</line>
++    </frame>
++  </stack>
++</error>
++
++<error>
++  <unique>0x........</unique>
++  <tid>...</tid>
++  <kind>FdNotClosed</kind>
++  <fd>3</fd>
++  <what>...</what>
++  <stack>
++    <frame>
++      <ip>0x........</ip>
++      <obj>...</obj>
++      <fn>client</fn>
++      <dir>...</dir>
++      <file>fdleak_cmsg.c</file>
++      <line>112</line>
++    </frame>
++  </stack>
++</error>
++
++<error>
++  <unique>0x........</unique>
++  <tid>...</tid>
++  <kind>FdNotClosed</kind>
++  <fd>2</fd>
++  <path>...</path>
++  <what>...</what>
++</error>
++
++<error>
++  <unique>0x........</unique>
++  <tid>...</tid>
++  <kind>FdNotClosed</kind>
++  <fd>1</fd>
++  <path>...</path>
++  <what>...</what>
++</error>
++
++<error>
++  <unique>0x........</unique>
++  <tid>...</tid>
++  <kind>FdNotClosed</kind>
++  <fd>0</fd>
++  <path>...</path>
++  <what>...</what>
++</error>
++
++
++</valgrindoutput>
++
+diff --git a/none/tests/fdleak_ipv4_xml.stderr.exp-ppc64le b/none/tests/fdleak_ipv4_xml.stderr.exp-ppc64le
+new file mode 100644
+index 000000000000..df413b62895c
+--- /dev/null
++++ b/none/tests/fdleak_ipv4_xml.stderr.exp-ppc64le
+@@ -0,0 +1,139 @@
++<?xml version="1.0"?>
++
++<valgrindoutput>
++
++<protocolversion>5</protocolversion>
++<protocoltool>none</protocoltool>
++
++<preamble>
++  <line>Nulgrind, the minimal Valgrind tool</line>
++  <line>Copyright...</line>
++  <line>Using Valgrind...</line>
++  <line>Command: ./fdleak_ipv4</line>
++</preamble>
++
++<pid>...</pid>
++<ppid>...</ppid>
++<tool>none</tool>
++
++<args>
++  <vargv>
++    <exe>...</exe>
++    <arg>--command-line-only=yes</arg>
++    <arg>--memcheck:leak-check=no</arg>
++    <arg>--tool=none</arg>
++    <arg>--track-fds=yes</arg>
++    <arg>--xml=yes</arg>
++    <arg>--xml-fd=2</arg>
++    <arg>--child-silent-after-fork=yes</arg>
++  </vargv>
++  <argv>
++    <exe>...</exe>
++  </argv>
++</args>
++
++<status>
++  <state>RUNNING</state>
++  <time>...</time>
++</status>
++
++<error>
++  <unique>0x........</unique>
++  <tid>...</tid>
++  <kind>FdBadClose</kind>
++  <fd>4</fd>
++  <what>...</what>
++  <stack>
++    <frame>
++      <ip>0x........</ip>
++      <obj>...</obj>
++      <fn>client</fn>
++      <dir>...</dir>
++      <file>fdleak_ipv4.c</file>
++      <line>70</line>
++    </frame>
++    <frame>
++      <ip>0x........</ip>
++      <obj>...</obj>
++      <fn>main</fn>
++      <dir>...</dir>
++      <file>fdleak_ipv4.c</file>
++      <line>90</line>
++    </frame>
++  </stack>
++  <auxwhat>Previously closed</auxwhat>
++  <stack>
++    <frame>
++      <ip>0x........</ip>
++      <obj>...</obj>
++      <fn>client</fn>
++      <dir>...</dir>
++      <file>fdleak_ipv4.c</file>
++      <line>69</line>
++    </frame>
++    <frame>
++      <ip>0x........</ip>
++      <obj>...</obj>
++      <fn>main</fn>
++      <dir>...</dir>
++      <file>fdleak_ipv4.c</file>
++      <line>90</line>
++    </frame>
++  </stack>
++  <auxwhat>Originally opened</auxwhat>
++  <stack>
++    <frame>
++      <ip>0x........</ip>
++      <obj>...</obj>
++      <fn>client</fn>
++      <dir>...</dir>
++      <file>fdleak_ipv4.c</file>
++      <line>68</line>
++    </frame>
++    <frame>
++      <ip>0x........</ip>
++      <obj>...</obj>
++      <fn>main</fn>
++      <dir>...</dir>
++      <file>fdleak_ipv4.c</file>
++      <line>90</line>
++    </frame>
++  </stack>
++</error>
++
++
++<status>
++  <state>FINISHED</state>
++  <time>...</time>
++</status>
++
++<error>
++  <unique>0x........</unique>
++  <tid>...</tid>
++  <kind>FdNotClosed</kind>
++  <fd>3</fd>
++  <what>...</what>
++  <stack>
++    <frame>
++      <ip>0x........</ip>
++      <obj>...</obj>
++      <fn>client</fn>
++      <dir>...</dir>
++      <file>fdleak_ipv4.c</file>
++      <line>51</line>
++    </frame>
++  </stack>
++</error>
++
++<errorcounts>
++  <pair>
++    <count>1</count>
++    <unique>0x........</unique>
++  </pair>
++</errorcounts>
++
++<suppcounts>
++</suppcounts>
++
++</valgrindoutput>
++
+diff --git a/none/tests/socket_close_xml.stderr.exp-ppc64le b/none/tests/socket_close_xml.stderr.exp-ppc64le
+new file mode 100644
+index 000000000000..2f2bc9831e79
+--- /dev/null
++++ b/none/tests/socket_close_xml.stderr.exp-ppc64le
+@@ -0,0 +1,98 @@
++<?xml version="1.0"?>
++
++<valgrindoutput>
++
++<protocolversion>5</protocolversion>
++<protocoltool>none</protocoltool>
++
++<preamble>
++  <line>Nulgrind, the minimal Valgrind tool</line>
++  <line>Copyright...</line>
++  <line>Using Valgrind...</line>
++  <line>Command: ./socket_close</line>
++</preamble>
++
++<pid>...</pid>
++<ppid>...</ppid>
++<tool>none</tool>
++
++<args>
++  <vargv>
++    <exe>...</exe>
++    <arg>--command-line-only=yes</arg>
++    <arg>--memcheck:leak-check=no</arg>
++    <arg>--tool=none</arg>
++    <arg>-q</arg>
++    <arg>--track-fds=yes</arg>
++    <arg>--xml=yes</arg>
++    <arg>--xml-fd=2</arg>
++  </vargv>
++  <argv>
++    <exe>...</exe>
++  </argv>
++</args>
++
++<status>
++  <state>RUNNING</state>
++  <time>...</time>
++</status>
++
++Open socket 3
++close socket_fd 3
++and close the socket again 3
++<error>
++  <unique>0x........</unique>
++  <tid>...</tid>
++  <kind>FdBadClose</kind>
++  <fd>3</fd>
++  <what>...</what>
++  <stack>
++    <frame>
++      <ip>0x........</ip>
++      <obj>...</obj>
++      <fn>main</fn>
++      <dir>...</dir>
++      <file>socket_close.c</file>
++      <line>40</line>
++    </frame>
++  </stack>
++  <auxwhat>Previously closed</auxwhat>
++  <stack>
++    <frame>
++      <ip>0x........</ip>
++      <obj>...</obj>
++      <fn>main</fn>
++      <dir>...</dir>
++      <file>socket_close.c</file>
++      <line>36</line>
++    </frame>
++  </stack>
++  <auxwhat>Originally opened</auxwhat>
++  <stack>
++    <frame>
++      <ip>0x........</ip>
++      <obj>...</obj>
++      <fn>open_socket</fn>
++      <dir>...</dir>
++      <file>socket_close.c</file>
++      <line>17</line>
++    </frame>
++  </stack>
++</error>
++
++
++<status>
++  <state>FINISHED</state>
++  <time>...</time>
++</status>
++
++<errorcounts>
++  <pair>
++    <count>1</count>
++    <unique>0x........</unique>
++  </pair>
++</errorcounts>
++
++
++</valgrindoutput>
++
+-- 
+2.47.0
+

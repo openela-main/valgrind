@@ -1,0 +1,27 @@
+From 7e79bb6e6b80eb43138cbbb64737433f9e036cd4 Mon Sep 17 00:00:00 2001
+From: Paul Floyd <pjfloyd@wanadoo.fr>
+Date: Thu, 21 Nov 2024 08:44:04 +0100
+Subject: [PATCH 04/11] regtest: add a fdleak filter for write on write on
+ linux arm64
+
+(cherry picked from commit 9150b3c7cfad2fdbeb7cf707175c359ee12d8f75)
+---
+ none/tests/filter_fdleak | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/none/tests/filter_fdleak b/none/tests/filter_fdleak
+index d26937bccd38..72923aa730c8 100755
+--- a/none/tests/filter_fdleak
++++ b/none/tests/filter_fdleak
+@@ -19,6 +19,8 @@ perl -p -e 's/socket\.c:[1-9][0-9]*/in \/...libc.../' |
+ # arm systems substitute open for creat
+ perl -p -e 's/open \(open64\.c:[1-9][0-9]*\)/creat (in \/...libc...)/' |
+ perl -p -e "s/: open \(/: creat (/" |
++# arm64 write resolved to file:line with debuginfo
++perl -p -e "s/write\.c:[1-9][0-9]*/in \/...libc.../" |
+ 
+ # FreeBSD specific fdleak filters
+ perl -p -e 's/ _close / close /;s/ _openat / creat /;s/internet/AF_INET socket 4: 127.0.0.1:... <-> 127.0.0.1:.../' |
+-- 
+2.47.0
+

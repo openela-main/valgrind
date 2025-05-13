@@ -1,18 +1,18 @@
-From 2afcd730a10d61c318289bc4c39c42eebd4b35a6 Mon Sep 17 00:00:00 2001
+From cc09f61e56e90c9d3a0e7231cc69b2a499d1205f Mon Sep 17 00:00:00 2001
 From: Mark Wielaard <mark@klomp.org>
-Date: Mon, 29 Apr 2024 15:15:46 +0200
-Subject: [PATCH 01/11] Prepare NEWS for branch 3.23 fixes
+Date: Sat, 23 Nov 2024 02:09:27 +0100
+Subject: [PATCH 01/11] Prepare NEWS for branch 3.24 fixes
 
 ---
  NEWS | 11 +++++++++++
  1 file changed, 11 insertions(+)
 
 diff --git a/NEWS b/NEWS
-index 11c67410fb6f..8bdd3753f7bb 100644
+index 49b4647d4295..8362e1d2df41 100644
 --- a/NEWS
 +++ b/NEWS
 @@ -1,3 +1,14 @@
-+Branch 3.23
++Branch 3.24
 +~~~~~~~~~~~
 +
 +* ==================== FIXED BUGS ====================
@@ -23,9 +23,9 @@ index 11c67410fb6f..8bdd3753f7bb 100644
 +  https://bugs.kde.org/show_bug.cgi?id=XXXXXX
 +where XXXXXX is the bug number as listed above.
 +
- Release 3.23.0 (26 Apr 2024)
+ Release 3.24.0 (31 Oct 2024)
  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  
 -- 
-2.45.2
+2.47.0
 
