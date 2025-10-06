@@ -1,0 +1,36 @@
+From 8b08da73cf3d72439c4f750c96ed2f088ef1bbec Mon Sep 17 00:00:00 2001
+From: Mark Wielaard <mark@klomp.org>
+Date: Tue, 12 Nov 2024 13:34:09 +0100
+Subject: [PATCH 03/11] vgdb.c (fork_and_exec_valgrind): Fix another off-by-one
+ error write
+
+commit 646978d9adc5 ("vgdb: Handle EINTR and EAGAIN more
+consistently") introduced another off-by-one issue trying to write
+back the error from child to parent.
+
+Instead of +1 it should have been +written (which initially is zero).
+
+This is when the child needs to do a chdir and that chdir fails. If
+that happens the parent would have gotten the wrong error code.
+
+(cherry picked from commit 747ca4eb5fed5dd58a14391a997bb9e658e3b1c8)
+---
+ coregrind/vgdb.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/coregrind/vgdb.c b/coregrind/vgdb.c
+index 112f23fe6ba1..cc945c8dfafa 100644
+--- a/coregrind/vgdb.c
++++ b/coregrind/vgdb.c
+@@ -1289,7 +1289,7 @@ int fork_and_exec_valgrind (int argc, char **argv, const char *working_dir,
+             // We try to write the result to the parent, but always exit.
+             size_t written = 0;
+             while (written < sizeof (int)) {
+-               int nrw = write (pipefd[1], ((char *)&err) + 1,
++               int nrw = write (pipefd[1], ((char *)&err) + written,
+                                 sizeof (int) - written);
+                if (nrw == -1) {
+                   if (errno == EINTR || errno == EAGAIN)
+-- 
+2.47.0
+

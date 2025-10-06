@@ -1,0 +1,45 @@
+From 7b2806871f15977db3a64a59f70d48f55ba3228e Mon Sep 17 00:00:00 2001
+From: Mark Wielaard <mark@klomp.org>
+Date: Thu, 16 Jan 2025 17:30:37 +0100
+Subject: [PATCH 18/18] gdbserver_tests: filter out new Missing rpms message
+
+As seen on the fedora 40 s390x tester. GDB now might output something
+like:
+
+Missing rpms, try: dnf --enablerepo='*debug*' install glibc-debuginfo-2.39-33.fc40.s390x
+
+Filter those messages out to get zero fail test results again.
+
+(cherry picked from commit 090f8ce59b5f3d3ec39e032ee5e9524ce4f51a44)
+---
+ gdbserver_tests/filter_gdb.in              | 1 +
+ gdbserver_tests/filter_memcheck_monitor.in | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/gdbserver_tests/filter_gdb.in b/gdbserver_tests/filter_gdb.in
+index 094ea933ec51..2bef9f3ee57b 100755
+--- a/gdbserver_tests/filter_gdb.in
++++ b/gdbserver_tests/filter_gdb.in
+@@ -265,6 +265,7 @@ s/^0x........ in \(\w\+ (\)/\1/
+ 
+ #	delete any missing debuginfo messages
+ /^Missing debuginfo.*/d
++/^Missing rpms.*/d
+ 
+ EOF
+ 
+diff --git a/gdbserver_tests/filter_memcheck_monitor.in b/gdbserver_tests/filter_memcheck_monitor.in
+index 6e8a49a303ba..e407e7b92158 100755
+--- a/gdbserver_tests/filter_memcheck_monitor.in
++++ b/gdbserver_tests/filter_memcheck_monitor.in
+@@ -31,6 +31,7 @@ $dir/filter_vgdb                                       |
+ $SED -e '/Cannot access memory at address 0x......../d'                   \
+     -e '/^[1-9][0-9]*	\.\.\/sysdeps\/powerpc\/powerpc32\/dl-start\.S: No such file or directory\./d' \
+     -e '/^Missing separate debuginfo/d'                                  \
++    -e '/^Missing rpms/d'                                                \
+     -e '/^Try: zypper install -C/d'                                      \
+     -e 's/Test 3:   FAIL: expected si_code==2, not 128/Test 3:   PASS/'  \
+     -e 's/in use at exit: [0-9][0-9,]* bytes in [0-9][0-9]* blocks/in use at exit: ... bytes in ... blocks/' \
+-- 
+2.48.1
+
