@@ -1,0 +1,87 @@
+diff --git a/coregrind/m_redir.c b/coregrind/m_redir.c
+index 63172b971..857f910cb 100644
+--- a/coregrind/m_redir.c
++++ b/coregrind/m_redir.c
+@@ -1508,6 +1508,12 @@ void VG_(redir_initialise) ( void )
+          NULL /* not mandatory - so why bother at all? */
+          /* glibc-2.5 (FC6, ppc64) seems fine without it */
+       );
++
++      add_hardwired_spec(
++         "ld64.so.2", "strcmp",
++         (Addr)&VG_(ppc64_linux_REDIR_FOR_strcmp),
++         NULL
++      );
+    }
+ 
+ #  elif defined(VGP_arm_linux)
+diff --git a/coregrind/m_trampoline.S b/coregrind/m_trampoline.S
+index 2c2cc0dc2..5e1f2f147 100644
+--- a/coregrind/m_trampoline.S
++++ b/coregrind/m_trampoline.S
+@@ -602,8 +602,52 @@ VG_(ppc64_linux_REDIR_FOR_strchr):
+         .long 0
+         .byte 0,0,0,0,0,0,0,0
+ .L1end:
+-
+ 	
++	/* this function is written using the "dotless" ABI convention */
++	.align 2
++	.globl VG_(ppc64_linux_REDIR_FOR_strcmp)
++#if !defined VGP_ppc64be_linux || _CALL_ELF == 2
++        /* Little Endian uses ELF version 2 */
++        .type VG_(ppc64_linux_REDIR_FOR_strcmp),@function
++VG_(ppc64_linux_REDIR_FOR_strcmp):
++#else
++        /* Big Endian uses ELF version 1 */
++	.section        ".opd","aw"
++	.align 3
++VG_(ppc64_linux_REDIR_FOR_strcmp):
++	.quad   .L.VG_(ppc64_linux_REDIR_FOR_strcmp),.TOC.@tocbase,0
++	.previous
++	.size	VG_(ppc64_linux_REDIR_FOR_strcmp), \
++			.LFE0-.L.VG_(ppc64_linux_REDIR_FOR_strcmp)
++	.type	VG_(ppc64_linux_REDIR_FOR_strcmp), @function
++
++.L.VG_(ppc64_linux_REDIR_FOR_strcmp):
++#endif
++#if _CALL_ELF == 2
++0:      addis        2,12,.TOC.-0b@ha
++        addi         2,2,.TOC.-0b@l
++        .localentry  VG_(ppc64_linux_REDIR_FOR_strcmp), .-VG_(ppc64_linux_REDIR_FOR_strcmp)
++#endif
++.LFB0:
++        .cfi_startproc
++        li 10,0
++.L3:
++        lbzx 8,3,10
++        lbzx 9,4,10
++        cmpwi 0,8,0
++        beq 0,.L2
++        cmpw 0,8,9
++        addi 10,10,1
++        beq 0,.L3
++.L2:
++        subf 3,9,8
++        extsw 3,3
++        blr
++        .long 0
++        .byte 0,0,0,0,0,0,0,0
++        .cfi_endproc
++.LFE0:
++
+ .global VG_(trampoline_stuff_end)
+ VG_(trampoline_stuff_end):
+ 
+diff --git a/coregrind/pub_core_trampoline.h b/coregrind/pub_core_trampoline.h
+index 11d791df7..92b4fc67b 100644
+--- a/coregrind/pub_core_trampoline.h
++++ b/coregrind/pub_core_trampoline.h
+@@ -97,6 +97,7 @@ extern void* VG_(ppc32_linux_REDIR_FOR_strchr)( void*, Int );
+ #if defined(VGP_ppc64be_linux) || defined(VGP_ppc64le_linux)
+ extern Addr  VG_(ppc64_linux_SUBST_FOR_rt_sigreturn);
+ extern UInt  VG_(ppc64_linux_REDIR_FOR_strlen)( void* );
++extern UInt  VG_(ppc64_linux_REDIR_FOR_strcmp)( void*, void* );
+ extern void* VG_(ppc64_linux_REDIR_FOR_strchr)( void*, Int );
+ /* A label (sans dot) marking the ultra-magical return stub via which
+    all redirected and wrapped functions are made to "return" on
