@@ -2,7 +2,7 @@
 
 Summary: Dynamic analysis tools to detect memory or thread bugs and profile
 Name: %{?scl_prefix}valgrind
-Version: 3.24.0
+Version: 3.25.1
 Release: 3%{?dist}
 Epoch: 1
 License: GPLv2+
@@ -78,21 +78,14 @@ Patch3: valgrind-3.16.0-some-stack-protector.patch
 # Add some -Wl,z,now.
 Patch4: valgrind-3.16.0-some-Wl-z-now.patch
 
-# VALGRIND_3_24_BRANCH patches
-Patch5: 0001-Prepare-NEWS-for-branch-3.24-fixes.patch
-Patch6: 0002-vgdb.c-fork_and_exec_valgrind-Fix-off-by-one-error-w.patch
-Patch7: 0003-vgdb.c-fork_and_exec_valgrind-Fix-another-off-by-one.patch
-Patch8: 0004-regtest-add-a-fdleak-filter-for-write-on-write-on-li.patch
-Patch9: 0005-Add-exp-and-supp-patterns-for-missing-main-frame-for.patch
-Patch10: 0006-Add-additional-exp-ppc64le-files-to-EXTRA_DIST.patch
-Patch11: 0007-Add-support-for-landlock_create_ruleset-444-landlock.patch
-Patch12: 0008-helgrind-tests-tc17_sembar.c-Remove-bool-typedef.patch
-Patch13: 0009-drd-tests-swapcontext.c-Rename-typedef-struct-thread.patch
-Patch14: 0010-none-tests-bug234814.c-sa_handler-take-an-int-as-arg.patch
-Patch15: 0011-Add-open_tree-move_mount-fsopen-fsconfig-fsmount-fsp.patch
-Patch16: 0012-Recognize-new-DWARF5-DW_LANG-constants.patch
-Patch17: 0013-Bug-498317-FdBadUse-is-not-a-valid-CoreError-type-in.patch
-Patch18: 0014-linux-support-EVIOCGRAB-ioctl.patch
+# VALGRIND_3_25_BRANCH patches
+Patch5: 0001-Prepare-NEWS-for-branch-3.25.x-fixes.patch
+Patch6: 0002-Bug-503241-s390x-Support-z17-changes-to-the-NNPA-ins.patch
+Patch7: 0003-Add-several-missing-syscall-hooks-to-ppc64-linux.patch
+
+# Proposed upstream patches
+# https://bugs.kde.org/show_bug.cgi?id=508145
+Patch101: ppc64-strcmp-ld.patch
 
 BuildRequires: make
 BuildRequires: glibc-devel
@@ -132,6 +125,11 @@ BuildRequires: elfutils-debuginfod-client
 Recommends: elfutils-debuginfod-client
 %endif
 
+# Optional subpackages
+Recommends: %{?scl_prefix}valgrind-docs = %{epoch}:%{version}-%{release}
+Recommends: %{?scl_prefix}valgrind-scripts = %{epoch}:%{version}-%{release}
+Recommends: %{?scl_prefix}valgrind-gdb = %{epoch}:%{version}-%{release}
+
 # For running the testsuite.
 # Some of the python scripts require python 3.9+
 BuildRequires: python3-devel
@@ -141,7 +139,7 @@ BuildRequires: python3-devel
 # We could use %%valgrind_arches as defined in redhat-rpm-config
 # But that is really for programs using valgrind, it defines the
 # set of architectures that valgrind works correctly on.
-ExclusiveArch: %{ix86} x86_64 ppc ppc64 ppc64le s390x armv7hl aarch64
+ExclusiveArch: %{ix86} x86_64 ppc ppc64 ppc64le s390x armv7hl aarch64 riscv64
 
 # Define valarch, the architecture name that valgrind uses
 # And only_arch, the configure option to only build for that arch.
@@ -177,6 +175,10 @@ ExclusiveArch: %{ix86} x86_64 ppc ppc64 ppc64le s390x armv7hl aarch64
 %define valarch arm64
 %define only_arch --enable-only64bit
 %endif
+%ifarch riscv64
+%define valarch riscv64
+%define only_arch --enable-only64bit
+%endif
 
 %description
 Valgrind is an instrumentation framework for building dynamic analysis
@@ -191,10 +193,42 @@ profiler (callgrind), and a heap profiler (massif).
 
 %package devel
 Summary: Development files for valgrind aware programs
-Requires: %{?scl_prefix}valgrind = %{epoch}:%{version}-%{release}
+# These are just the header files, so strictly speaking you don't
+# need valgrind itself unless you are testing your builds. This used
+# to be a Requires, so people might depend on the package pulling in
+# the core valgrind package, so make it at least a weak dependency.
+Recommends: %{?scl_prefix}valgrind = %{epoch}:%{version}-%{release}
 
 %description devel
 Header files and libraries for development of valgrind aware programs.
+
+%package docs
+Summary: Documentation for valgrind tools, scripts and gdb integration
+License: GFDL-1.2-or-later
+
+%description docs
+Documentation in html and pdf, plus man pages for valgrind tools and scripts.
+
+%package scripts
+Summary: Scripts for post-processing valgrind tool output
+License: GPL-2.0-or-later
+# Most scripts can be used as is for post-processing a valgrind tool run.
+# But callgrind_control uses vgdb.
+Recommends: %{?scl_prefix}valgrind-gdb = %{epoch}:%{version}-%{release}
+
+%description scripts
+Perl and Python scripts for post-processing valgrind tool output.
+
+%package gdb
+Summary: Tools for integrating valgrind and gdb
+License: GPL-2.0-or-later
+Requires: %{?scl_prefix}valgrind = %{epoch}:%{version}-%{release}
+# vgdb can be used without gdb, just to control valgrind.
+# But normally you use it together with both valgrind and gdb.
+Recommends: gdb
+
+%description gdb
+Tools and support files for integrating valgrind and gdb.
 
 %if %{build_tools_devel}
 %package tools-devel
@@ -228,17 +262,8 @@ Valgrind User Manual for details.
 %patch -P5 -p1
 %patch -P6 -p1
 %patch -P7 -p1
-%patch -P8 -p1
-%patch -P9 -p1
-%patch -P10 -p1
-%patch -P11 -p1
-%patch -P12 -p1
-%patch -P13 -p1
-%patch -P14 -p1
-%patch -P15 -p1
-%patch -P16 -p1
-%patch -P17 -p1
-%patch -P18 -p1
+
+%patch -P101 -p1
 
 %build
 # LTO triggers undefined symbols in valgrind.  But valgrind has a
@@ -409,18 +434,41 @@ echo ===============END TESTING===============
 %{!?_licensedir:%global license %%doc}
 
 %files
-%license COPYING COPYING.DOCS
-%doc NEWS README_*
-%doc docs/installed/html docs/installed/*.pdf
-%{_bindir}/*
+%license COPYING
+%{_bindir}/valgrind
 %dir %{_libexecdir}/valgrind
-# Install everything in the libdir except the .so.
-# The vgpreload so files might need file mode adjustment.
-%{_libexecdir}/valgrind/*[^o]
+# Install just the core tools, default suppression and vgpreload libraries.
+%{_libexecdir}/valgrind/default.supp
+%{_libexecdir}/valgrind/*-*-linux
 # Turn on executable bit again for vgpreload libraries.
 # Was disabled in %%install to prevent debuginfo stripping.
-%attr(0755,root,root) %{_libexecdir}/valgrind/vgpreload*-%{valarch}-*so
+%attr(0755,root,root) %{_libexecdir}/valgrind/vgpreload_*-%{valarch}-linux.so
+
+%files docs
+%license COPYING.DOCS
+%doc NEWS README_*
+%doc docs/installed/html docs/installed/*.pdf
 %{_mandir}/man1/*
+
+%files scripts
+%license COPYING
+%{_bindir}/callgrind_annotate
+%{_bindir}/callgrind_control
+%{_bindir}/cg_annotate
+%{_bindir}/cg_diff
+%{_bindir}/cg_merge
+%{_bindir}/ms_print
+%{_libexecdir}/valgrind/dh_view.css
+%{_libexecdir}/valgrind/dh_view.html
+%{_libexecdir}/valgrind/dh_view.js
+
+%files gdb
+%license COPYING
+%{_bindir}/valgrind-di-server
+%{_bindir}/valgrind-listener
+%{_bindir}/vgdb
+# gdb register descriptions
+%{_libexecdir}/valgrind/*.xml
 %{_datadir}/gdb/auto-load/valgrind-monitor.py
 %{_datadir}/gdb/auto-load/valgrind-monitor-def.py
 
@@ -453,24 +501,41 @@ echo ===============END TESTING===============
 %{_libdir}/valgrind/libmpiwrap*.so
 %endif
 
-%if 0%{?rhel} == 6
-%post
-# There is a bug in rpm (rhbz#214737) that might cause post to be run
-# even thought the binary isn't installed when installing two multilib
-# versions at the same time.
-if [ -x %{_bindir}/valgrind ]; then
-# On RHEL6 the fs equivalency should be setup by the devtoolset meta
-# package, but because of a rpm bug (rhbz#924044) it might not work.
-%{?scl:/sbin/restorecon %{_bindir}/valgrind}%{!?scl:true}
-fi
-%endif
-
 %changelog
+* Mon Aug 18 2025 Mark Wielaard <mjw@redhat.com> - 3.25.1-3
+- Add ppc64-strcmp-ld.patch
+- Add 0003-Add-several-missing-syscall-hooks-to-ppc64-linux.patch
+
+* Tue Aug  5 2025 Mark Wielaard <mjw@redhat.com> - 3.25.1-2
+- Add VALGRIND_3_25_BRANCH patches
+  - 0001-Prepare-NEWS-for-branch-3.25.x-fixes.patch
+  - 0002-Bug-503241-s390x-Support-z17-changes-to-the-NNPA-ins.patch
+
+* Thu May 22 2025 Mark Wielaard <mjw@redhat.com> - 3.25.1-1
+- Valgrind 3.25.1 final
+
+* Fri Apr 25 2025 Mark Wielaard <mjw@redhat.com> - 3.25.0-1
+- Valgrind 3.25.0 final
+
+* Wed Feb 26 2025 Mark Wielaard <mjw@redhat.com> - 3.24.0-4
+- Split main valgrind package into several subpackages:
+  - valgrind now contains just the core tools.
+  - valgrind-scripts contains the post-processing scripts for callgrind,
+    cachegrind, massif and dhat which depend on perl and python.
+  - valgrind-gdb contains the debuginfo client/server and (v)gdb support.
+  - valgrind-docs contains the man pages, html and pdf manual.
+- Adjust Requires/Recommends to subpackages can be installed independently.
+  - valgrind-devel now Recommends, instead of Requires, valgrind.
+  - valgrind-gdb Requires valgrind
+  - valgrind-scripts Recommends valgrind-gdb
+  - valgrind-gdb Recommends gdb
+
 * Tue Jan 14 2025 Mark Wielaard <mjw@redhat.com> - 3.24.0-3
 - Add more VALGRIND_3_24_BRANCH patches
   0012-Recognize-new-DWARF5-DW_LANG-constants.patch
   0013-Bug-498317-FdBadUse-is-not-a-valid-CoreError-type-in.patch
   0014-linux-support-EVIOCGRAB-ioctl.patch
+
 * Tue Nov 26 2024 Mark Wielaard <mjw@redhat.com> - 3.24.0-2
 - Add VALGRIND_3_24_BRANCH patches
   0001-Prepare-NEWS-for-branch-3.24-fixes.patch
