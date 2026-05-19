@@ -2,10 +2,10 @@
 
 Summary: Dynamic analysis tools to detect memory or thread bugs and profile
 Name: %{?scl_prefix}valgrind
-Version: 3.25.1
-Release: 3%{?dist}
+Version: 3.26.0
+Release: 5%{?dist}
 Epoch: 1
-License: GPLv2+
+License: GPLv3+
 URL: https://www.valgrind.org/
 
 # Are we building for a Software Collection?
@@ -73,19 +73,23 @@ Patch1: valgrind-3.9.0-cachegrind-improvements.patch
 Patch2: valgrind-3.9.0-ldso-supp.patch
 
 # Add some stack-protector
-Patch3: valgrind-3.16.0-some-stack-protector.patch
+Patch3: valgrind-3.26.0-some-stack-protector.patch
 
 # Add some -Wl,z,now.
-Patch4: valgrind-3.16.0-some-Wl-z-now.patch
+Patch4: valgrind-3.26.0-some-Wl-z-now.patch
 
-# VALGRIND_3_25_BRANCH patches
-Patch5: 0001-Prepare-NEWS-for-branch-3.25.x-fixes.patch
-Patch6: 0002-Bug-503241-s390x-Support-z17-changes-to-the-NNPA-ins.patch
-Patch7: 0003-Add-several-missing-syscall-hooks-to-ppc64-linux.patch
+# VALGRIND_3_26_BRANCH patches
+Patch5: 0001-Prepare-NEWS-for-branch-3.26-fixes.patch
+Patch6: 0002-Bug-511972-valgrind-3.26.0-tests-fail-to-build-on-up.patch
+Patch7: 0003-readlink-proc-self-exe-overwrites-buffer-beyond-its-.patch
+Patch8: 0004-Linux-DRD-suppression-add-an-entry-for-__is_decorate.patch
+Patch9: 0005-Linux-Helgrind-add-a-suppression-for-_dl_allocate_tl.patch
+Patch10: 0006-Disable-linux-madvise-MADV_GUARD_INSTALL.patch
+Patch11: 0007-Bug-514613-Unclosed-leak_summary-still_reachable-tag.patch
+Patch12: 0008-Bug-514206-Assertion-sr_isError-sr-failed-mmap-fd-po.patch
 
-# Proposed upstream patches
-# https://bugs.kde.org/show_bug.cgi?id=508145
-Patch101: ppc64-strcmp-ld.patch
+# Refix for https://bugs.kde.org/show_bug.cgi?id=514613
+Patch100: 0001-Refix-still_reachable-xml-closing-tag-and-add-testca.patch
 
 BuildRequires: make
 BuildRequires: glibc-devel
@@ -211,7 +215,7 @@ Documentation in html and pdf, plus man pages for valgrind tools and scripts.
 
 %package scripts
 Summary: Scripts for post-processing valgrind tool output
-License: GPL-2.0-or-later
+License: GPL-3.0-or-later
 # Most scripts can be used as is for post-processing a valgrind tool run.
 # But callgrind_control uses vgdb.
 Recommends: %{?scl_prefix}valgrind-gdb = %{epoch}:%{version}-%{release}
@@ -221,7 +225,7 @@ Perl and Python scripts for post-processing valgrind tool output.
 
 %package gdb
 Summary: Tools for integrating valgrind and gdb
-License: GPL-2.0-or-later
+License: GPL-3.0-or-later
 Requires: %{?scl_prefix}valgrind = %{epoch}:%{version}-%{release}
 # vgdb can be used without gdb, just to control valgrind.
 # But normally you use it together with both valgrind and gdb.
@@ -262,8 +266,13 @@ Valgrind User Manual for details.
 %patch -P5 -p1
 %patch -P6 -p1
 %patch -P7 -p1
+%patch -P8 -p1
+%patch -P9 -p1
+%patch -P10 -p1
+%patch -P11 -p1
+%patch -P12 -p1
 
-%patch -P101 -p1
+%patch -P100 -p1
 
 %build
 # LTO triggers undefined symbols in valgrind.  But valgrind has a
@@ -467,6 +476,7 @@ echo ===============END TESTING===============
 %{_bindir}/valgrind-di-server
 %{_bindir}/valgrind-listener
 %{_bindir}/vgdb
+%{_bindir}/vgstack
 # gdb register descriptions
 %{_libexecdir}/valgrind/*.xml
 %{_datadir}/gdb/auto-load/valgrind-monitor.py
@@ -502,6 +512,27 @@ echo ===============END TESTING===============
 %endif
 
 %changelog
+* Thu Jan 29 2026 Mark Wielaard <mjw@redhat.com> - 3.26.0-5
+- Add 0001-Refix-still_reachable-xml-closing-tag-and-add-testca.patch
+
+* Tue Jan 27 2026 Mark Wielaard <mjw@redhat.com> - 3.26.0-4
+- Add VALGRIND_3_26_BRANCH patches
+  - 0001-Prepare-NEWS-for-branch-3.26-fixes.patch
+  - 0002-Bug-511972-valgrind-3.26.0-tests-fail-to-build-on-up.patch
+  - 0003-readlink-proc-self-exe-overwrites-buffer-beyond-its-.patch
+  - 0004-Linux-DRD-suppression-add-an-entry-for-__is_decorate.patch
+  - 0005-Linux-Helgrind-add-a-suppression-for-_dl_allocate_tl.patch
+  - 0006-Disable-linux-madvise-MADV_GUARD_INSTALL.patch
+  - 0007-Bug-514613-Unclosed-leak_summary-still_reachable-tag.patch
+  - 0008-Bug-514206-Assertion-sr_isError-sr-failed-mmap-fd-po.patch
+
+* Tue Nov  4 2025 Mark Wielaard <mjw@redhat.com> - 3.26.0-1
+- Valgrind 3.26.0 final
+- Remove all VALGRIND_3_25_BRANCH and proposed upstream patches
+- Refresh some-stack-protector and some-Wl-z-now patches.
+- Add vgstack to valgrind-gdb.
+- Update License to GPL-3.0-or-later
+
 * Mon Aug 18 2025 Mark Wielaard <mjw@redhat.com> - 3.25.1-3
 - Add ppc64-strcmp-ld.patch
 - Add 0003-Add-several-missing-syscall-hooks-to-ppc64-linux.patch
