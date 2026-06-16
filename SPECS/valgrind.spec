@@ -3,7 +3,7 @@
 Summary: Dynamic analysis tools to detect memory or thread bugs and profile
 Name: %{?scl_prefix}valgrind
 Version: 3.22.0
-Release: 3%{?dist}
+Release: 4%{?dist}
 Epoch: 1
 License: GPLv2+
 URL: https://www.valgrind.org/
@@ -137,8 +137,8 @@ Recommends: %{?scl_prefix}valgrind-scripts = %{epoch}:%{version}-%{release}
 Recommends: %{?scl_prefix}valgrind-gdb = %{epoch}:%{version}-%{release}
 
 # Some of the python scripts require python 3.9+
-BuildRequires: python3.11
-BuildRequires: python3.11-rpm-macros
+BuildRequires: python3.12
+BuildRequires: python3.12-rpm-macros
 
 %{?scl:Requires:%scl_runtime}
 
@@ -526,6 +526,9 @@ fi
 %endif
 
 %changelog
+* Tue May 19 2026 Mark Wielaard <mjw@redhat.com> - 3.22.0-4
+- RHEL-166036: valgrind-scripts depends on python3.11 which reaches EOL
+
 * Fri Jan 24 2025 Mark Wielaard <mjw@redhat.com> - 3.22.0-3
 - Split main valgrind package into several subpackages:
   - valgrind now contains just the core tools.
