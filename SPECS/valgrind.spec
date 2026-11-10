@@ -2,8 +2,8 @@
 
 Summary: Dynamic analysis tools to detect memory or thread bugs and profile
 Name: %{?scl_prefix}valgrind
-Version: 3.26.0
-Release: 5%{?dist}
+Version: 3.27.1
+Release: 1%{?dist}
 Epoch: 1
 
 # This ignores licenses that are only found in the test or perf sources
@@ -84,19 +84,6 @@ Patch3: valgrind-3.26.0-some-stack-protector.patch
 
 # Add some -Wl,z,now.
 Patch4: valgrind-3.26.0-some-Wl-z-now.patch
-
-# VALGRIND_3_26_BRANCH patches
-Patch5: 0001-Prepare-NEWS-for-branch-3.26-fixes.patch
-Patch6: 0002-Bug-511972-valgrind-3.26.0-tests-fail-to-build-on-up.patch
-Patch7: 0003-readlink-proc-self-exe-overwrites-buffer-beyond-its-.patch
-Patch8: 0004-Linux-DRD-suppression-add-an-entry-for-__is_decorate.patch
-Patch9: 0005-Linux-Helgrind-add-a-suppression-for-_dl_allocate_tl.patch
-Patch10: 0006-Disable-linux-madvise-MADV_GUARD_INSTALL.patch
-Patch11: 0007-Bug-514613-Unclosed-leak_summary-still_reachable-tag.patch
-Patch12: 0008-Bug-514206-Assertion-sr_isError-sr-failed-mmap-fd-po.patch
-
-# Refix for https://bugs.kde.org/show_bug.cgi?id=514613
-Patch100: 0001-Refix-still_reachable-xml-closing-tag-and-add-testca.patch
 
 BuildRequires: make
 BuildRequires: glibc-devel
@@ -276,17 +263,6 @@ Valgrind User Manual for details.
 %patch -P2 -p1
 %patch -P3 -p1
 %patch -P4 -p1
-
-%patch -P5 -p1
-%patch -P6 -p1
-%patch -P7 -p1
-%patch -P8 -p1
-%patch -P9 -p1
-%patch -P10 -p1
-%patch -P11 -p1
-%patch -P12 -p1
-
-%patch -P100 -p1
 
 %build
 # LTO triggers undefined symbols in valgrind.  But valgrind has a
@@ -527,6 +503,12 @@ echo ===============END TESTING===============
 %endif
 
 %changelog
+* Wed May 20 2026 Mark Wielaard <mjw@redhat.com> - 3.27.1-1
+- Valgrind 3.27.1 final
+
+* Tue Apr 21 2026 Mark Wielaard <mjw@redhat.com> - 3.27.0-1
+- Valgrind 3.27.0 final
+
 * Thu Jan 29 2026 Mark Wielaard <mjw@redhat.com> - 3.26.0-5
 - Add 0001-Refix-still_reachable-xml-closing-tag-and-add-testca.patch
 
