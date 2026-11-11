@@ -1,0 +1,36 @@
+commit 8d7fb56ed35c4cfa6a0af6a6e698bda9d5091a33
+Author: Martin Cermak <marticak@gmx.com>
+Date:   Thu Sep 10 14:11:45 2026 +0200
+
+    Valgrind's vgdb extended-remote mode broken on aarch64
+    
+    At the moment, valgrind doesn't provide the target description XML
+    on aarch64: target_xml() in valgrind-low-arm64.c isn't implemented
+    yet. But it does advertise it via qXfer:features:read.
+    
+    Related commit 2d3d477689a688ab mentions: What remains to be done:
+    * arm64 xml register description files (allowing shadow registers to be looked at).
+    * ptrace invoker : currently disabled for both arm and arm64
+    * cpsr transfer to/from gdb to be looked at (see also arm equivalent code)
+    
+    This patch prevents advertising qXfer:features:read on aarch64 and
+    makes valgrind work with gdb-17 in extended-remote mode on aarch64.
+    
+    https://bugs.kde.org/show_bug.cgi?id=525478
+
+diff --git a/coregrind/vgdb.c b/coregrind/vgdb.c
+index 8cf524a4f..806c5456a 100644
+--- a/coregrind/vgdb.c
++++ b/coregrind/vgdb.c
+@@ -1434,8 +1434,11 @@ void do_multi_mode(int check_trials, int in_port)
+                         "QCatchSyscalls+;"
+                         /* Just report support always. */
+                         "qXfer:auxv:read+;"
++/* https://bugs.kde.org/show_bug.cgi?id=525478 */
++#if !defined(VGA_arm64)
+                         /* We'll force --vgdb-shadow-registers=yes */
+                         "qXfer:features:read+;"
++#endif
+                         "qXfer:exec-file:read+;"
+                         "qXfer:siginfo:read+;"
+                         /* Extra vgdb support before valgrind starts up. */
