@@ -3,7 +3,7 @@
 Summary: Dynamic analysis tools to detect memory or thread bugs and profile
 Name: %{?scl_prefix}valgrind
 Version: 3.27.1
-Release: 1%{?dist}
+Release: 2%{?dist}
 Epoch: 1
 
 # This ignores licenses that are only found in the test or perf sources
@@ -84,6 +84,9 @@ Patch3: valgrind-3.26.0-some-stack-protector.patch
 
 # Add some -Wl,z,now.
 Patch4: valgrind-3.26.0-some-Wl-z-now.patch
+
+# https://redhat.atlassian.net/browse/RHEL-256888
+Patch5: valgrind-3.27.1-vgdb-extended-remote-mode.patch
 
 BuildRequires: make
 BuildRequires: glibc-devel
@@ -263,6 +266,7 @@ Valgrind User Manual for details.
 %patch -P2 -p1
 %patch -P3 -p1
 %patch -P4 -p1
+%patch -P5 -p1
 
 %build
 # LTO triggers undefined symbols in valgrind.  But valgrind has a
@@ -503,6 +507,9 @@ echo ===============END TESTING===============
 %endif
 
 %changelog
+* Thu Sep 10 2026 Martin Cermak <mcermak@redhat.com> - 3.27.1-2
+- Fix bug https://bugs.kde.org/show_bug.cgi?id=525478
+
 * Wed May 20 2026 Mark Wielaard <mjw@redhat.com> - 3.27.1-1
 - Valgrind 3.27.1 final
 
